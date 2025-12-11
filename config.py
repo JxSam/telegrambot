@@ -56,7 +56,7 @@ AI_PROMPT = """
 
 # ... остальные настройки ...
 # Подпись
-SIGNATURE = "\n\n@pnews_gg"
+SIGNATURE = "\n\n@pnewsgg"
 
 # Режимы работы
 MODE = "REVIEW"  # "REVIEW" (ручная проверка) или "AUTO" (автоматическая публикация)
