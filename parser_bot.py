@@ -58,6 +58,7 @@ def convert_markdown_to_html(markdown_text: str) -> str:
     """
     html_text = markdown_text
 
+    html_text = re.sub(r'\[(.+?)\]\((.+?)\)', r'<a href="\2">\1</a>', html_text)
     # 1. Markdown в HTML
     # Жирный шрифт: **текст**
     html_text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', html_text)
