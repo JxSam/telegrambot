@@ -396,11 +396,7 @@ async def process_callback_query(callback_query: types.CallbackQuery):
         # --- РЕДАКТИРОВАНИЕ ---
         # 1. Убираем кнопки
         try:
-            if is_media_message:
-                await callback_query.message.edit_caption(callback_query.message.caption, reply_markup=None,
-                                                          parse_mode=ParseMode.HTML)
-            else:
-                await callback_query.message.edit_reply_markup(reply_markup=None)
+            await callback_query.answer("🤖 Уникализация текста…", show_alert=False)
         except Exception:
             pass
 
