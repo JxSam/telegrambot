@@ -158,7 +158,6 @@ async def handler_new_post(event):
 
     post_text = get_html_text(event.message)
     final_text = post_text + config.SIGNATURE
-
     media_path = None
     media_info = ""
 
