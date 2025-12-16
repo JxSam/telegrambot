@@ -18,6 +18,7 @@ from aiogram.types import BufferedInputFile
 
 import httpx
 import config
+from utils import *
 
 # --- Настройки ---
 DOWNLOAD_DIR = 'downloads'
@@ -360,10 +361,11 @@ async def process_callback_query(callback_query: types.CallbackQuery):
             print(f"❌ Ошибка редактирования при начале уникализации: {e}")
 
         # 2. Главное: ВЫЗЫВАЕМ УНИКАЛИЗАЦИЮ ВСЕГДА!
-        unique_text = await ai_unique_text(current_text)
+        clean_text = strip_signature(current_text)
+        unique_body = await ai_unique_text(clean_text)
+        final_unique_text = unique_body + config.SIGNATURE
 
-        # 3. Обновляем данные
-        data['text'] = unique_text
+        data['text'] = final_unique_text
         dp['review_posts'][post_id] = data
 
         # 4. Пересобираем клавиатуру
@@ -381,7 +383,7 @@ async def process_callback_query(callback_query: types.CallbackQuery):
         final_message = f"🤖 <b>УНИКАЛИЗАЦИЯ ЗАВЕРШЕНА!</b>\n\n" \
                         f"<i>ID: {post_id}</i>\n" \
                         "------------------------\n" \
-                        f"{unique_text}"
+                        f"{final_unique_text}"
 
         if is_media_message:
             await callback_query.message.edit_caption(caption=final_message, parse_mode=ParseMode.HTML,
