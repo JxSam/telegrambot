@@ -337,30 +337,6 @@ async def process_callback_query(callback_query: types.CallbackQuery):
                                parse_mode=ParseMode.HTML)
 
     elif action == "ai_unique":
-        # --- ГАРАНТИРОВАННАЯ УНИКАЛИЗАЦИЯ С СОХРАНЕНИЕМ ТЕКСТА ---
-
-        # 1. Уведомляем о начале обработки, не удаляя старый текст
-        unique_prefix = f'&#8203;'  # Невидимый символ для гарантии модификации
-
-        # Создаем временный текст, добавляя статус в начало *текущего* текста:
-        status_message = f"🤖 <b>{unique_prefix}УНИКАЛИЗАЦИЯ (ИДЁТ)...</b>\n"
-        temp_processing_text = f"{status_message}\n------------------------\n{current_text}"
-
-        reply_markup = None
-
-        try:
-            # Пытаемся обновить статус и убрать кнопки
-            if is_media_message:
-                await callback_query.message.edit_caption(temp_processing_text, reply_markup=reply_markup,
-                                                          parse_mode=ParseMode.HTML)
-            else:
-                await callback_query.message.edit_text(temp_processing_text, reply_markup=reply_markup,
-                                                       parse_mode=ParseMode.HTML)
-        except Exception as e:
-            # Если тут ошибка "not modified", это значит, что кто-то кликнул слишком быстро. Продолжаем обработку.
-            print(f"❌ Ошибка редактирования при начале уникализации: {e}")
-
-        # 2. Главное: ВЫЗЫВАЕМ УНИКАЛИЗАЦИЮ ВСЕГДА!
         clean_text = strip_signature(current_text)
         unique_body = await ai_unique_text(clean_text)
         final_unique_text = unique_body + config.SIGNATURE
