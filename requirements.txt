@@ -1,0 +1,10 @@
+aiogram==3.24.0
+aiohappyeyeballs==2.6.1
+aiohttp==3.13.3
+aiosignal==1.4.0
+annotated-types==0.7.0
+anyio==4.12.1
+httpx==0.28.1
+pydantic==2.12.5
+pydantic_core==2.41.5
+Telethon==1.42.0
