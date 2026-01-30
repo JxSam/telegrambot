@@ -3,20 +3,18 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Telegram API (от my.telegram.org)
-# ВАЖНО: Telethon требует API_ID и API_HASH для работы с аккаунтом
+# Telethon требует API_ID и API_HASH для работы с аккаунтом
 API_ID = 24445592
 API_HASH = "eae79b2a0476a5af0aaa4e55d7615efe"
 
 # Бот-админ (от BotFather)
 BOT_TOKEN = "8566777029:AAE7uEGvY5aVzKHHcXbsVpK7dEXvCiwpIKk"
 
-# Добавьте ваш облачный пароль (2FA) сюда!
-# Если у вас НЕТ 2FA, оставьте эту переменную пустой строкой: TELEGRAM_PASSWORD = ""
+# облачный пароль (2FA)(при наличии)
 TELEGRAM_PASSWORD = "SamMurz2003"
 
 # Каналы
-SOURCE_CHANNELS = ["@tass_agency", "@my_brak"]  # Откуда брать (список строк)
+SOURCE_CHANNELS = ["@my_brak"]  # Откуда брать (список строк)
 DESTINATION_CHANNEL = "@pnewsgg"  # Куда постить (строка)
 ADMIN_ID = 1112309604  # Твой ID (целое число)
 
