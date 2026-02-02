@@ -12,61 +12,12 @@ from modules.ai.service import ai_unique_text
 
 from utils import *
 
-# --- Функции администрирования (Aiogram) ---
+# --- Функции администрирования ---
 
 class AdminHandler():
     def __init__(self, bot, dispatcher):
         self.bot = bot
         self.dp = dispatcher
-
-    async def send_to_review(self, text: str, media_info: str, media_path: str):
-        """
-        Отправляет пост на проверку админу с интерактивными кнопками.
-        """
-        # Уникальный ID поста
-        post_id = hash(text + str(asyncio.get_event_loop().time()))
-
-        review_data = {'text': text, 'media_path': media_path, 'caption': text}
-
-        self.dp['review_posts'][post_id] = review_data
-
-        builder = InlineKeyboardBuilder()
-        builder.row(
-        types.InlineKeyboardButton(text="✨ Уникализация (AI)", callback_data=f"ai_unique_{post_id}"),
-        types.InlineKeyboardButton(text="✏️ Редактировать", callback_data=f"edit_{post_id}")
-        )
-        builder.row(
-        types.InlineKeyboardButton(text="✅ Опубликовать", callback_data=f"publish_{post_id}"),
-        types.InlineKeyboardButton(text="🗑️ Удалить", callback_data=f"delete_{post_id}")
-        )
-
-        review_message = f"<b>🔥 Новый пост на проверку!</b> {media_info}\n\n" \
-                     f"<i>ID: {post_id}</i>\n" \
-                     "------------------------\n" \
-                     f"{text}"
-
-        if media_path:
-            media_type = media_path.lower().split('.')[-1]
-
-            with open(media_path, 'rb') as media_file:
-                media_data = media_file.read()
-
-            file_input = BufferedInputFile(media_data, filename=os.path.basename(media_path))
-            if media_type in ('png', 'jpg', 'jpeg', 'webp'):
-                await self.bot.send_photo(chat_id=config.ADMIN_ID, photo=file_input, caption=review_message,
-                                     parse_mode=ParseMode.HTML, reply_markup=builder.as_markup())
-            elif media_type in ('mp4', 'mov', 'avi', 'gif', 'webm'):
-                await self.bot.send_video(chat_id=config.ADMIN_ID, video=file_input, caption=review_message,
-                                     parse_mode=ParseMode.HTML, reply_markup=builder.as_markup())
-            else:
-                await self.bot.send_message(chat_id=config.ADMIN_ID, text=review_message, parse_mode=ParseMode.HTML,
-                                       reply_markup=builder.as_markup())
-                await delete_temp_media(media_path)
-                review_data['media_path'] = None
-
-        else:
-            await self.bot.send_message(chat_id=config.ADMIN_ID, text=review_message, parse_mode=ParseMode.HTML,
-                               reply_markup=builder.as_markup())
 
     async def process_callback_query(self, callback_query: types.CallbackQuery):
         """Обработка нажатий на кнопки администрирования."""
@@ -259,9 +210,62 @@ class AdminHandler():
             )
 
 class ParsHandler():
-    def __init__(self, bot, DOWNLOAD_DIR):
-        self.dp = bot
-        self.DOWNLOAD_DIR = DOWNLOAD_DIR
+    def __init__(self, bot, dp, dir, client, chats):
+        self.bot = bot
+        self.dp = dp
+        self.DOWNLOAD_DIR = dir
+        self.client = client
+        self.chats = chats
+
+    async def send_to_review(self, text: str, media_info: str, media_path: str):
+        """
+        Отправляет пост на проверку админу с интерактивными кнопками.
+        """
+        # Уникальный ID поста
+        post_id = hash(text + str(asyncio.get_event_loop().time()))
+
+        review_data = {'text': text, 'media_path': media_path, 'caption': text}
+
+        self.dp['review_posts'][post_id] = review_data
+
+        builder = InlineKeyboardBuilder()
+        builder.row(
+        types.InlineKeyboardButton(text="✨ Уникализация (AI)", callback_data=f"ai_unique_{post_id}"),
+        types.InlineKeyboardButton(text="✏️ Редактировать", callback_data=f"edit_{post_id}")
+        )
+        builder.row(
+        types.InlineKeyboardButton(text="✅ Опубликовать", callback_data=f"publish_{post_id}"),
+        types.InlineKeyboardButton(text="🗑️ Удалить", callback_data=f"delete_{post_id}")
+        )
+
+        review_message = f"<b>🔥 Новый пост на проверку!</b> {media_info}\n\n" \
+                     f"<i>ID: {post_id}</i>\n" \
+                     "------------------------\n" \
+                     f"{text}"
+
+        if media_path:
+            media_type = media_path.lower().split('.')[-1]
+
+            with open(media_path, 'rb') as media_file:
+                media_data = media_file.read()
+
+            file_input = BufferedInputFile(media_data, filename=os.path.basename(media_path))
+            if media_type in ('png', 'jpg', 'jpeg', 'webp'):
+                await self.bot.send_photo(chat_id=config.ADMIN_ID, photo=file_input, caption=review_message,
+                                     parse_mode=ParseMode.HTML, reply_markup=builder.as_markup())
+            elif media_type in ('mp4', 'mov', 'avi', 'gif', 'webm'):
+                await self.bot.send_video(chat_id=config.ADMIN_ID, video=file_input, caption=review_message,
+                                     parse_mode=ParseMode.HTML, reply_markup=builder.as_markup())
+            else:
+                await self.bot.send_message(chat_id=config.ADMIN_ID, text=review_message, parse_mode=ParseMode.HTML,
+                                       reply_markup=builder.as_markup())
+                await delete_temp_media(media_path)
+                review_data['media_path'] = None
+
+        else:
+            await self.bot.send_message(chat_id=config.ADMIN_ID, text=review_message, parse_mode=ParseMode.HTML,
+                               reply_markup=builder.as_markup())
+
     # --- Обработчик парсинга (Telethon) ---
     async def handler_new_post(self, event):
         """Обрабатывает новое сообщение в любом из исходных каналов."""
@@ -290,4 +294,8 @@ class ParsHandler():
             print(f"✅ Пост автоматически опубликован в {config.DESTINATION_CHANNEL}.")
             if media_path: await delete_temp_media(media_path)
         elif config.MODE == "REVIEW":
-            await AdminHandler.send_to_review(final_text, media_info, media_path)
+            await self.send_to_review(final_text, media_info, media_path)
+
+    def register(self):
+        # регистрация обработчика Telethon
+        self.client.add_event_handler(self.handler_new_post, events.NewMessage(chats=self.chats))

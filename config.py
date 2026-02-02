@@ -9,7 +9,6 @@ load_dotenv()
 DOWNLOAD_DIR = 'downloads'
 
 # Telegram API (от my.telegram.org)
-# ВАЖНО: Telethon требует API_ID и API_HASH для работы с аккаунтом
 API_ID = 24445592
 API_HASH = "eae79b2a0476a5af0aaa4e55d7615efe"
 
@@ -21,13 +20,10 @@ BOT_TOKEN = "8566777029:AAE7uEGvY5aVzKHHcXbsVpK7dEXvCiwpIKk"
 TELEGRAM_PASSWORD = "SamMurz2003"
 
 # Каналы
-SOURCE_CHANNELS = ["@my_brak",
-                   ""
-                   ]  # Откуда брать (список строк)
-DESTINATION_CHANNEL = "@pnewsgg"  # Куда постить (строка)
-ADMIN_ID = 1112309604  # Твой ID (целое число)
+SOURCE_CHANNELS = ["@my_brak"]
+DESTINATION_CHANNEL = "@pnewsgg"  # Куда постить
+ADMIN_ID = 1112309604  # Твой ID
 
-# ... остальные настройки ...
 # Подпись
 SIGNATURE = "\n\n@pnewsgg"
 
