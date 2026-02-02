@@ -83,9 +83,9 @@ def escape_html_entities(text: str) -> str:
     """Экранирует специальные символы HTML: &, <, >."""
     return escape(text)
 
-def ensure_download_dir():
+def ensure_download_dir(dir):
     """Создает папку downloads, если она не существует."""
-    os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+    os.makedirs(dir, exist_ok=True)
 
 async def delete_temp_media(file_path: str):
     """Безопасно удаляет временный медиафайл."""

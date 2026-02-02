@@ -2,6 +2,8 @@ import httpx
 
 import config
 
+from modules.functions import convert_markdown_to_html, escape_html_entities
+
 async def ai_unique_text(text: str) -> str:
     """Отправляет текст в OpenRouter API для уникализации."""
     url = "https://openrouter.ai/api/v1/chat/completions"

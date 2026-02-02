@@ -6,8 +6,9 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from telethon import TelegramClient
 import config
-from modules.media_handlers import ensure_download_dir
-from modules.handlers import MainHandler
+from config import DOWNLOAD_DIR
+from modules.handlers import AdminHandler, ParsHandler
+from modules.functions import *
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
@@ -20,12 +21,10 @@ dp = Dispatcher()
 dp['review_posts'] = {}
 dp['waiting_for_edit'] = {}
 
-review_service = MainHandler(bot, dp)
-
 async def main():
     """Основная функция запуска клиента и бота."""
 
-    ensure_download_dir()
+    ensure_download_dir(DOWNLOAD_DIR)
 
     await parser_client.start(password=config.TELEGRAM_PASSWORD)
     print("Telethon Client запущен.")

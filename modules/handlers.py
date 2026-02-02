@@ -7,6 +7,8 @@ from aiogram import types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.enums import ParseMode
 from aiogram.types import BufferedInputFile
+from modules.functions import *
+from modules.ai.service import ai_unique_text
 
 from utils import *
 
@@ -257,9 +259,11 @@ class AdminHandler():
             )
 
 class ParsHandler():
+    def __init__(self, bot, DOWNLOAD_DIR):
+        self.dp = bot
+        self.DOWNLOAD_DIR = DOWNLOAD_DIR
     # --- Обработчик парсинга (Telethon) ---
-    @parser_client.on(events.NewMessage(chats=config.SOURCE_CHANNELS))
-    async def handler_new_post(event):
+    async def handler_new_post(self, event):
         """Обрабатывает новое сообщение в любом из исходных каналов."""
 
         if not event.message.text and not event.message.media: return
@@ -270,10 +274,10 @@ class ParsHandler():
         media_info = ""
 
         if event.message.media:
-            ensure_download_dir()
+            ensure_download_dir(self.DOWNLOAD_DIR)
             media_info = " (с медиа-вложением)"
             try:
-                media_path = await event.message.download_media(file=DOWNLOAD_DIR)
+                media_path = await event.message.download_media(file=self.DOWNLOAD_DIR)
                 print(f"📥 Медиа загружено: {media_path}")
             except Exception as e:
                 print(f"❌ Ошибка при загрузке медиа: {e}")
@@ -282,8 +286,8 @@ class ParsHandler():
         print(f"Получен новый пост{media_info} из {event.chat_id}. Режим: {config.MODE}")
 
         if config.MODE == "AUTO":
-            await bot.send_message(chat_id=config.DESTINATION_CHANNEL, text=final_text, parse_mode=ParseMode.HTML)
+            await self.bot.send_message(chat_id=config.DESTINATION_CHANNEL, text=final_text, parse_mode=ParseMode.HTML)
             print(f"✅ Пост автоматически опубликован в {config.DESTINATION_CHANNEL}.")
             if media_path: await delete_temp_media(media_path)
         elif config.MODE == "REVIEW":
-            await send_to_review(final_text, media_info, media_path)
+            await AdminHandler.send_to_review(final_text, media_info, media_path)
