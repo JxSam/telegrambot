@@ -21,7 +21,9 @@ BOT_TOKEN = "8566777029:AAE7uEGvY5aVzKHHcXbsVpK7dEXvCiwpIKk"
 TELEGRAM_PASSWORD = "SamMurz2003"
 
 # Каналы
-SOURCE_CHANNELS = ["@tass_agency", "@my_brak"]  # Откуда брать (список строк)
+SOURCE_CHANNELS = ["@my_brak",
+                   ""
+                   ]  # Откуда брать (список строк)
 DESTINATION_CHANNEL = "@pnewsgg"  # Куда постить (строка)
 ADMIN_ID = 1112309604  # Твой ID (целое число)
 

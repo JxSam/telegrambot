@@ -1,4 +1,12 @@
+import re
+import os
+from html import escape
 
+from telethon.tl.types import (
+    MessageEntityBold, MessageEntityItalic, MessageEntityTextUrl, MessageEntityCode,
+    MessageEntityPre, MessageEntityStrike, MessageEntityUnderline, MessageEntitySpoiler,
+    MessageEntityUrl, MessageEntityCustomEmoji, MessageEntityMentionName, MessageEntityBlockquote
+)
 
 def convert_markdown_to_html(markdown_text: str) -> str:
     """Конвертирует MarkdownV2 символы в HTML."""
@@ -74,3 +82,16 @@ def get_html_text(message) -> str:
 def escape_html_entities(text: str) -> str:
     """Экранирует специальные символы HTML: &, <, >."""
     return escape(text)
+
+def ensure_download_dir():
+    """Создает папку downloads, если она не существует."""
+    os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+async def delete_temp_media(file_path: str):
+    """Безопасно удаляет временный медиафайл."""
+    if file_path and os.path.exists(file_path):
+        try:
+            os.remove(file_path)
+            print(f"🗑️ Временный медиафайл удален: {file_path}")
+        except Exception as e:
+            print(f"❌ Ошибка при удалении файла {file_path}: {e}")

@@ -7,6 +7,7 @@ from aiogram.enums import ParseMode
 from telethon import TelegramClient
 import config
 from modules.media_handlers import ensure_download_dir
+from modules.handlers import MainHandler
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
@@ -18,6 +19,8 @@ bot = Bot(token=config.BOT_TOKEN, default=default_properties)
 dp = Dispatcher()
 dp['review_posts'] = {}
 dp['waiting_for_edit'] = {}
+
+review_service = MainHandler(bot, dp)
 
 async def main():
     """Основная функция запуска клиента и бота."""
