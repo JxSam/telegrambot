@@ -1,7 +1,8 @@
 import re
 import os
 from html import escape
-
+from aiogram import types
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 from telethon.tl.types import (
     MessageEntityBold, MessageEntityItalic, MessageEntityTextUrl, MessageEntityCode,
     MessageEntityPre, MessageEntityStrike, MessageEntityUnderline, MessageEntitySpoiler,
@@ -95,3 +96,16 @@ async def delete_temp_media(file_path: str):
             print(f"🗑️ Временный медиафайл удален: {file_path}")
         except Exception as e:
             print(f"❌ Ошибка при удалении файла {file_path}: {e}")
+
+def build_buttons_post(post_id):
+    """Клавиатура для действий с постом"""
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        types.InlineKeyboardButton(text="✨ Уникализация (AI)", callback_data=f"ai_unique_{post_id}"),
+        types.InlineKeyboardButton(text="✏️ Редактировать", callback_data=f"edit_{post_id}")
+    )
+    builder.row(
+        types.InlineKeyboardButton(text="✅ Опубликовать", callback_data=f"publish_{post_id}"),
+        types.InlineKeyboardButton(text="🗑️ Удалить", callback_data=f"delete_{post_id}")
+    )
+    return builder

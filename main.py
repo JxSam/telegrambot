@@ -24,7 +24,7 @@ dp['waiting_for_edit'] = {}
 admin_handler = AdminHandler(bot, dp)
 dp.callback_query.register(
     admin_handler.process_callback_query,
-    lambda c: c.data and c.data.startswith(('ai_unique_', 'publish_', 'delete_', 'edit_'))
+    lambda c: c.data and c.data.startswith(('ai_unique_', 'publish_', 'delete_', 'edit_', 'back_'))
 )
 dp.message.register(
     admin_handler.handle_admin_reply

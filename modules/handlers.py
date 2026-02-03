@@ -53,8 +53,6 @@ class AdminHandler():
 
         if action == "publish":
             # --- ОПУБЛИКОВАТЬ ---
-
-            # 1. Убираем кнопки (пытаемся, но игнорируем ошибку "not modified")
             try:
                 if is_media_message:
                     await callback_query.message.edit_caption(caption=callback_query.message.caption, reply_markup=None,
@@ -65,6 +63,7 @@ class AdminHandler():
                 pass
 
             try:
+                await callback_query.message.edit_caption(caption="⏳ Публикация…", parse_mode=ParseMode.HTML)
                 # 2. Публикация в целевой канал
                 if media_path and os.path.exists(media_path):
                     media_type = media_path.lower().split('.')[-1]
@@ -75,29 +74,49 @@ class AdminHandler():
                     file_input = BufferedInputFile(media_data, filename=os.path.basename(media_path))
 
                     if media_type in ('png', 'jpg', 'jpeg', 'webp'):
-                        await self.bot.send_photo(chat_id=config.DESTINATION_CHANNEL, photo=file_input, caption=current_text,
-                                             parse_mode=ParseMode.HTML)
+                        sent_message = await self.bot.send_photo(
+                            chat_id=config.DESTINATION_CHANNEL,
+                            photo=file_input,
+                            caption=current_text,
+                            parse_mode=ParseMode.HTML
+                        )
                     elif media_type in ('mp4', 'mov', 'avi', 'gif', 'webm'):
-                        await self.bot.send_video(chat_id=config.DESTINATION_CHANNEL, video=file_input, caption=current_text,
-                                             parse_mode=ParseMode.HTML)
+                        sent_message = await self.bot.send_video(
+                            chat_id=config.DESTINATION_CHANNEL,
+                            video=file_input,
+                            caption=current_text,
+                            parse_mode=ParseMode.HTML
+                        )
                     else:
-                        await self.bot.send_message(chat_id=config.DESTINATION_CHANNEL, text=current_text,
-                                               parse_mode=ParseMode.HTML)
+                        sent_message = await self.bot.send_message(
+                            chat_id=config.DESTINATION_CHANNEL,
+                            text=current_text,
+                            parse_mode=ParseMode.HTML
+                        )
                 else:
-                    await self.bot.send_message(chat_id=config.DESTINATION_CHANNEL, text=current_text,
-                                           parse_mode=ParseMode.HTML)
-
-                # 3. Редактируем сообщение админу (ГАРАНТИРУЕМ УНИКАЛЬНОСТЬ ФИНАЛЬНОГО ТЕКСТА)
-                unique_suffix = f'&#x200B; (ID:{post_id})'
-                final_admin_msg = f"✅ <b>ОПУБЛИКОВАНО!</b>\n\n{current_text}{unique_suffix}"
-
-                if is_media_message:
-                    await callback_query.message.edit_caption(final_admin_msg, parse_mode=ParseMode.HTML)
+                    sent_message = await self.bot.send_message(
+                        chat_id=config.DESTINATION_CHANNEL,
+                        text=current_text,
+                        parse_mode=ParseMode.HTML
+                    )
+                if sent_message.chat.username:
+                    post_link = f"https://t.me/{sent_message.chat.username}/{sent_message.message_id}"
                 else:
-                    await callback_query.message.edit_text(final_admin_msg, parse_mode=ParseMode.HTML)
+                    # приватный канал
+                    chat_id = str(sent_message.chat.id).replace("-100", "")
+                    post_link = f"https://t.me/c/{chat_id}/{sent_message.message_id}"
+
+                # 3. Отправляем сообщение об успешности
+                await self.bot.send_message(
+                    callback_query.from_user.id,
+                    f"✅ <b>Пост опубликован.</b>\n🔗 <a href=\"{post_link}\">Открыть пост</a>",
+                    parse_mode=ParseMode.HTML,
+                    disable_web_page_preview=True
+                )
+                await callback_query.message.delete()
 
             except Exception as e:
-                # 4. Обработка ошибки публикации (ГАРАНТИРУЕМ УНИКАЛЬНОСТЬ СООБЩЕНИЯ)
+                # 4. Обработка ошибки публикации
                 unique_suffix = f'&#x200B; (Error ID:{post_id})'
                 error_msg = f"❌ Ошибка публикации: {escape_html_entities(str(e))}\n\nОригинал: {current_text}{unique_suffix}"
 
@@ -106,21 +125,15 @@ class AdminHandler():
                 else:
                     await callback_query.message.edit_text(error_msg, parse_mode=ParseMode.HTML)
 
-            # 5. ОЧИСТКА ВРЕМЕННЫХ ФАЙЛОВ
             if media_path: await delete_temp_media(media_path)
-
-            # 6. Удаление данных о посте
             del self.dp['review_posts'][post_id]
 
         elif action == "delete":
             # --- УДАЛИТЬ ---
-            # 1. ОЧИСТКА ВРЕМЕННЫХ ФАЙЛОВ
             if media_path: await delete_temp_media(media_path)
             del self.dp['review_posts'][post_id]
 
-            # 2. Удаляем сообщение
             await callback_query.message.delete()
-            # 3. Отправляем подтверждение
             await self.bot.send_message(callback_query.from_user.id, f"🗑️ <b>Пост удален.</b> (ID: {post_id})",
                                    parse_mode=ParseMode.HTML)
 
@@ -133,15 +146,7 @@ class AdminHandler():
             self.dp['review_posts'][post_id] = data
 
             # 4. Пересобираем клавиатуру
-            builder = InlineKeyboardBuilder()
-            builder.row(
-                types.InlineKeyboardButton(text="✨ Уникализация (AI)", callback_data=f"ai_unique_{post_id}"),
-                types.InlineKeyboardButton(text="✏️ Редактировать", callback_data=f"edit_{post_id}")
-            )
-            builder.row(
-                types.InlineKeyboardButton(text="✅ Опубликовать", callback_data=f"publish_{post_id}"),
-                types.InlineKeyboardButton(text="🗑️ Удалить", callback_data=f"delete_{post_id}")
-            )
+            builder = build_buttons_post(post_id)
 
             # 5. Редактируем сообщение (медиа остается, текст обновляется)
             final_message = f"🤖 <b>УНИКАЛИЗАЦИЯ ЗАВЕРШЕНА!</b>\n\n" \
@@ -158,19 +163,46 @@ class AdminHandler():
 
         elif action == "edit":
             # --- РЕДАКТИРОВАНИЕ ---
-            # 1. Убираем кнопки
-            try:
-                await callback_query.answer("🤖 Уникализация текста…", show_alert=False)
-            except Exception:
-                pass
+            builder = InlineKeyboardBuilder()
+            builder.row(
+                types.InlineKeyboardButton(
+                    text="⬅️ Вернуться",
+                    callback_data=f"back_{post_id}"
+                )
+            )
 
             # 2. Устанавливаем состояние (текст для запроса ответа)
             await callback_query.message.edit_text(
                 f"✏️ <b>ОТПРАВЬТЕ НОВЫЙ ТЕКСТ</b> для поста с ID: {post_id_str}. "
                 "Ответьте на это сообщение новым текстом.",
                 parse_mode=ParseMode.HTML
+                , reply_markup=builder.as_markup()
             )
             self.dp['waiting_for_edit'][callback_query.message.chat.id] = post_id
+        elif action == "back":
+            # Сбрасываем режим редактирования
+            self.dp['waiting_for_edit'].pop(callback_query.message.chat.id, None)
+
+            builder = build_buttons_post(post_id)
+
+            final_message = (
+                f"<i>ID: {post_id}</i>\n"
+                "------------------------\n"
+                f"{current_text}"
+            )
+
+            if is_media_message:
+                await callback_query.message.edit_caption(
+                    caption=final_message,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=builder.as_markup()
+                )
+            else:
+                await callback_query.message.edit_text(
+                    final_message,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=builder.as_markup()
+                )
 
         await callback_query.answer()
 
@@ -190,15 +222,7 @@ class AdminHandler():
             self.dp['review_posts'][post_id]['text'] = new_text
 
             # Пересобираем клавиатуру
-            builder = InlineKeyboardBuilder()
-            builder.row(
-                types.InlineKeyboardButton(text="✨ Уникализация (AI)", callback_data=f"ai_unique_{post_id}"),
-                types.InlineKeyboardButton(text="✏️ Редактировать", callback_data=f"edit_{post_id}")
-            )
-            builder.row(
-                types.InlineKeyboardButton(text="✅ Опубликовать", callback_data=f"publish_{post_id}"),
-                types.InlineKeyboardButton(text="🗑️ Удалить", callback_data=f"delete_{post_id}")
-            )
+            builder = build_buttons_post(post_id)
 
             await message.reply(
                 f"✅ <b>ТЕКСТ ОБНОВЛЕН!</b>\n\n"
@@ -228,15 +252,7 @@ class ParsHandler():
 
         self.dp['review_posts'][post_id] = review_data
 
-        builder = InlineKeyboardBuilder()
-        builder.row(
-        types.InlineKeyboardButton(text="✨ Уникализация (AI)", callback_data=f"ai_unique_{post_id}"),
-        types.InlineKeyboardButton(text="✏️ Редактировать", callback_data=f"edit_{post_id}")
-        )
-        builder.row(
-        types.InlineKeyboardButton(text="✅ Опубликовать", callback_data=f"publish_{post_id}"),
-        types.InlineKeyboardButton(text="🗑️ Удалить", callback_data=f"delete_{post_id}")
-        )
+        builder = build_buttons_post(post_id)
 
         review_message = f"<b>🔥 Новый пост на проверку!</b> {media_info}\n\n" \
                      f"<i>ID: {post_id}</i>\n" \
