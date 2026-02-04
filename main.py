@@ -7,23 +7,8 @@ from aiogram.enums import ParseMode
 from telethon import TelegramClient, events
 import config
 from config import DOWNLOAD_DIR
-from modules.handlers import AdminHandler, ParsHandler, MenuHandler
+from modules.handlers import MenuHandler, SettingsHandler
 from modules.functions import *
-
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
-
-parser_client = TelegramClient(config.SESSION_NAME, config.API_ID, config.API_HASH)
-default_properties = DefaultBotProperties(parse_mode=ParseMode.HTML)
-bot = Bot(token=config.BOT_TOKEN, default=default_properties)
-dp = Dispatcher()
-dp['review_posts'] = {}
-dp['waiting_for_edit'] = {}
-
-menu = MenuHandler(dp)
-menu.register()
-
 
 # admin_handler = AdminHandler(bot, dp)
 #
@@ -39,9 +24,23 @@ menu.register()
 # pars_handler = ParsHandler(bot, dp, DOWNLOAD_DIR, parser_client, config.SOURCE_CHANNELS)
 # pars_handler.register()
 
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 async def main():
     """Основная функция запуска"""
+    parser_client = TelegramClient(config.SESSION_NAME, config.API_ID, config.API_HASH)
+    default_properties = DefaultBotProperties(parse_mode=ParseMode.HTML)
+    bot = Bot(token=config.BOT_TOKEN, default=default_properties)
+    dp = Dispatcher()
+    dp['review_posts'] = {}
+    dp['waiting_for_edit'] = {}
+
+    menu = MenuHandler(dp)
+    menu.register()
+    settings = SettingsHandler(dp)
+    settings.register()
 
     #Создание и проверка наличия папки для скачивания медиа
     ensure_download_dir(DOWNLOAD_DIR)
