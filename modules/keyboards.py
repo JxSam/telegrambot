@@ -1,5 +1,10 @@
 from aiogram import types
+from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
+channels = [
+
+]
+# --- Кнопки ---
 main_menu_keyboard = [
             [types.KeyboardButton(text="📬 Показать посты")],
             [types.KeyboardButton(text="⚙️ Настройки")]
@@ -14,6 +19,33 @@ channel_kb = [
     [types.InlineKeyboardButton(text="✏️ Изменить", callback_data="settings:list")],
     [types.InlineKeyboardButton(text="⬅️ Назад", callback_data="settings:back")]
 ]
+
+def build_reply_menu(keyboard):
+    """Клавиатура для кнопок под полем ввода"""
+    return types.ReplyKeyboardMarkup(
+        keyboard=keyboard,
+        resize_keyboard=True
+    )
+
+# --- Функции для меню ---
+def build_inline_menu(keyboard):
+    """Клавиатура для кнопок под сообщением"""
+    return types.InlineKeyboardMarkup(
+        inline_keyboard=keyboard,
+        resize_keyboard=True
+    )
+
+
+def build_variable_list(channels: list[str]):
+    keyboard = [
+        [types.InlineKeyboardButton(text=f"📡 {ch}", callback_data=f"settings:channel{ch}")]
+        for ch in channels
+    ]
+    keyboard.append(
+        [types.InlineKeyboardButton(text="⬅️ Назад", callback_data="settings:back")]
+    )
+
+    return types.InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 # def build_actions_menu(post_id):
 #     actions_builder = InlineKeyboardBuilder()

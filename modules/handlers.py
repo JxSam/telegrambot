@@ -46,14 +46,21 @@ class SettingsHandler(MenuHandler):
 
     async def callback(self, callback: types.CallbackQuery):
         action = callback.data
+        channels = ['@ww', '@1']
+        ch = str
 
         if action == "settings:list":
             await callback.message.edit_text(
-                "📋 <b>Подключённые каналы</b>\n\n(пока пусто)",
+                "📋 <b>Подключённые каналы</b>",
                 parse_mode="HTML",
-                reply_markup=build_inline_menu(settings_menu_kb)
+                reply_markup=build_variable_list(channels)
             )
 
+        elif action == "settings:channel":
+            await callback.message.edit_text(
+                f"Вы уверены, что хотите удалить {ch}",
+                parse_mode="HTML"
+            )
         elif action == "settings:add":
             await callback.message.edit_text(
                 "Текущий канал @channel_id\n"

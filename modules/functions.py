@@ -96,17 +96,3 @@ async def delete_temp_media(file_path: str):
             print(f"🗑️ Временный медиафайл удален: {file_path}")
         except Exception as e:
             print(f"❌ Ошибка при удалении файла {file_path}: {e}")
-
-def build_reply_menu(keyboard):
-    """Клавиатура для кнопок под полем ввода"""
-    return types.ReplyKeyboardMarkup(
-        keyboard=keyboard,
-        resize_keyboard=True
-    )
-
-def build_inline_menu(keyboard):
-    """Клавиатура для кнопок под сообщением"""
-    return types.InlineKeyboardMarkup(
-        inline_keyboard=keyboard,
-        resize_keyboard=True
-    )
