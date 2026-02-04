@@ -1,7 +1,7 @@
 import sqlite3
 from pathlib import Path
 
-DB_PATH = Path("data/bot.db")
+DB_PATH = Path("../data/bot.db")
 
 
 def connect_db():
