@@ -7,7 +7,7 @@ from aiogram.enums import ParseMode
 from telethon import TelegramClient, events
 import config
 from config import DOWNLOAD_DIR
-from modules.handlers import AdminHandler, ParsHandler
+from modules.handlers import AdminHandler, ParsHandler, MenuHandler
 from modules.functions import *
 
 logging.basicConfig(level=logging.INFO,
@@ -21,17 +21,23 @@ dp = Dispatcher()
 dp['review_posts'] = {}
 dp['waiting_for_edit'] = {}
 
-admin_handler = AdminHandler(bot, dp)
-dp.callback_query.register(
-    admin_handler.process_callback_query,
-    lambda c: c.data and c.data.startswith(('ai_unique_', 'publish_', 'delete_', 'edit_', 'back_'))
-)
-dp.message.register(
-    admin_handler.handle_admin_reply
-)
+menu = MenuHandler(dp)
+menu.register()
 
-pars_handler = ParsHandler(bot, dp, DOWNLOAD_DIR, parser_client, config.SOURCE_CHANNELS)
-pars_handler.register()
+
+# admin_handler = AdminHandler(bot, dp)
+#
+#
+# dp.callback_query.register(
+#     admin_handler.process_callback_query,
+#     lambda c: c.data and c.data.startswith(('ai_unique_', 'publish_', 'delete_', 'edit_', 'back_'))
+# )
+# dp.message.register(
+#     admin_handler.handle_admin_reply
+# )
+#
+# pars_handler = ParsHandler(bot, dp, DOWNLOAD_DIR, parser_client, config.SOURCE_CHANNELS)
+# pars_handler.register()
 
 
 async def main():

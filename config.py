@@ -17,7 +17,7 @@ BOT_TOKEN = "8566777029:AAE7uEGvY5aVzKHHcXbsVpK7dEXvCiwpIKk"
 
 # Добавьте ваш облачный пароль (2FA) сюда!
 # Если у вас НЕТ 2FA, оставьте эту переменную пустой строкой: TELEGRAM_PASSWORD = ""
-TELEGRAM_PASSWORD = "SamMurz2003"
+TELEGRAM_PASSWORD = "JohnyX2003"
 
 # Каналы
 SOURCE_CHANNELS = ["@my_brak"]

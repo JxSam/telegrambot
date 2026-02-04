@@ -1,19 +1,48 @@
 import asyncio
 import os
 
+from aiogram import Dispatcher
 from telethon import events
 
-from aiogram import types
-from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.filters import CommandStart, Command
 from aiogram.enums import ParseMode
 from aiogram.types import BufferedInputFile
 from modules.functions import *
 from modules.ai.service import ai_unique_text
-
+from modules.keyboards import *
 from utils import *
 
-# --- Функции администрирования ---
+# --- Главное меню ---
+class MenuHandler:
+    def __init__(self, dp: Dispatcher):
+        self.dp = dp
 
+    async def start(self, message: types.Message):
+        await message.answer(
+            "👋 Привет!\n\n"
+            "Я бот для модерации постов.\n"
+            "Выберите действие:",
+            reply_markup=build_main_menu()
+        )
+
+    async def show_posts(self, message: types.Message):
+        await message.answer(
+            "📦 В очереди пока нет постов.",
+            reply_markup=build_main_menu()
+        )
+
+    async def settings(self, message: types.Message):
+        await message.answer(
+            "⚙️ Настройки (в разработке)",
+            reply_markup=build_main_menu()
+        )
+
+    def register(self):
+        self.dp.message.register(self.start, CommandStart())
+        self.dp.message.register(self.show_posts, lambda m: m.text == "📬 Показать посты")
+        self.dp.message.register(self.settings, lambda m: m.text == "⚙️ Настройки")
+
+# --- Функции администрирования ---
 class AdminHandler():
     def __init__(self, bot, dispatcher):
         self.bot = bot

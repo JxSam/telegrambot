@@ -3,3 +3,4 @@ downloads
 parser_session.session
 parser_session.session-journal
 .idea
+test.py
