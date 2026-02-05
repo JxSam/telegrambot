@@ -1,5 +1,6 @@
 from aiogram import types
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
+from modules.database import connect_db
 
 channels = [
 
@@ -12,11 +13,15 @@ main_menu_keyboard = [
 
 settings_menu_kb = [
             [types.InlineKeyboardButton(text="📋 Список каналов", callback_data="settings:list")],
-            [types.InlineKeyboardButton(text="📥 Канал куда выкладывать", callback_data="settings:add")]
+            [types.InlineKeyboardButton(text="📥 Канал куда выкладывать", callback_data="settings:channel")]
 ]
 
 channel_kb = [
-    [types.InlineKeyboardButton(text="✏️ Изменить", callback_data="settings:list")],
+    [types.InlineKeyboardButton(text="✏️ Изменить", callback_data="settings:channel_edit")],
+    [types.InlineKeyboardButton(text="⬅️ Назад", callback_data="settings:back")]
+]
+
+back_button = [
     [types.InlineKeyboardButton(text="⬅️ Назад", callback_data="settings:back")]
 ]
 
@@ -36,17 +41,39 @@ def build_inline_menu(keyboard):
         resize_keyboard=True
     )
 
-def build_variable_list(channels: list[str]):
+def build_variable_list():
+    channels = []
+    conn = connect_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT id, name FROM Channels')
+    channels_dict = cursor.fetchall()
+    conn.close()
+    for channel in channels_dict:
+        channels.append(channel[1])
     keyboard = [
-        [types.InlineKeyboardButton(text=f"📡 {ch}", callback_data=f"settings:channel{ch}")]
+        [types.InlineKeyboardButton(
+            text=f"📡 {ch}",
+            callback_data=f"settings:channel_actions?{ch}"
+        )]
         for ch in channels
     ]
     keyboard.append(
-        [types.InlineKeyboardButton(text="⬅️ Назад", callback_data="settings:back")]
+        [
+         types.InlineKeyboardButton(text="⬅️ Назад", callback_data="settings:back"),
+         types.InlineKeyboardButton(text="➕ Добавить", callback_data="settings:channel_add")
+        ]
     )
 
     return types.InlineKeyboardMarkup(inline_keyboard=keyboard)
 
+def build_channel_actions(name_channel):
+    return types.InlineKeyboardMarkup(
+        inline_keyboard=[
+                [types.InlineKeyboardButton(text="⬅️ Назад", callback_data="settings:list")],
+                [types.InlineKeyboardButton(text="❌ Удалить", callback_data=f"settings:channel_delete?{name_channel}")]
+        ],
+        resize_keyboard=True
+    )
 # def build_actions_menu(post_id):
 #     actions_builder = InlineKeyboardBuilder()
 #     actions_builder.row(

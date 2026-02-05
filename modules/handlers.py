@@ -2,9 +2,11 @@ import asyncio
 import os
 
 from aiogram import Dispatcher
+from aiogram.fsm.context import FSMContext
 from telethon import events
-
+from modules.database import *
 from aiogram.filters import CommandStart, Command
+from aiogram.fsm.state import State, StatesGroup
 from aiogram.enums import ParseMode
 from aiogram.types import BufferedInputFile
 from modules.functions import *
@@ -36,6 +38,9 @@ class MenuHandler:
         self.dp.message.register(self.show_posts, lambda m: m.text == "📬 Показать посты")
 
 # --- Настройки ---
+class SettingsState(StatesGroup):
+    waiting_channel = State()
+
 class SettingsHandler(MenuHandler):
     async def open_settings(self, message: types.Message):
         await message.answer(
@@ -44,26 +49,71 @@ class SettingsHandler(MenuHandler):
             reply_markup=build_inline_menu(settings_menu_kb)
         )
 
-    async def callback(self, callback: types.CallbackQuery):
-        action = callback.data
-        channels = ['@ww', '@1']
-        ch = str
+    async def get_channel(self, message: types.Message, state: FSMContext):
+        channel = message.text.strip()
 
-        if action == "settings:list":
+        if not channel.startswith("@"):
+            await message.answer("❌ Канал должен быть в формате @channel_name")
+            return
+
+        conn = connect_db()
+        cursor = conn.cursor()
+        cursor.execute(
+            f'UPDATE Settings SET value = "{channel}" WHERE id = 5'
+        )
+        conn.commit()
+        conn.close()
+
+        await message.answer(f"✅ Канал {channel} сохранён")
+        await state.clear()
+
+    async def callback(self, callback: types.CallbackQuery, state: FSMContext):
+        data = callback.data.split("?")
+        action = data[0]
+        print("ACTION =", repr(action))
+
+        if action == "settings:channel_actions":
+            channel = data[1]
             await callback.message.edit_text(
-                "📋 <b>Подключённые каналы</b>",
+                f"📡 <b>Канал:</b> {channel}\n\n"
+                "Вы хотите удалить канал?",
                 parse_mode="HTML",
-                reply_markup=build_variable_list(channels)
+                reply_markup=build_channel_actions(channel)
             )
+
+        elif action == "settings:channel_delete":
+            channel = data[1]
+            conn = connect_db()
+            cursor = conn.cursor()
+            cursor.execute(f"DELETE FROM Channels WHERE name = '{channel}'")
+            conn.commit()
+            conn.close()
+
+            await callback.message.edit_text(
+                f"❌ Канал {channel} удалён"
+            )
+
+        elif action == "settings:list":
+            await callback.message.edit_text(
+                "📋 <b>Подключeнные каналы</b>",
+                parse_mode="HTML",
+                reply_markup=build_variable_list()
+            )
+
+        elif action == "settings:channel_edit":
+            await callback.message.edit_text(
+                "Пришлите ссылку на канал @channel_name"
+            )
+            await state.set_state(SettingsState.waiting_channel)
 
         elif action == "settings:channel":
+            conn = connect_db()
+            cursor = conn.cursor()
+            cursor.execute('SELECT value FROM Settings WHERE id = 5')
+            channel = cursor.fetchall()[0][0]
+            conn.close()
             await callback.message.edit_text(
-                f"Вы уверены, что хотите удалить {ch}",
-                parse_mode="HTML"
-            )
-        elif action == "settings:add":
-            await callback.message.edit_text(
-                "Текущий канал @channel_id\n"
+                f"Текущий канал {channel}\n"
                 "Сюда выкладываются посты.",
                 parse_mode="HTML",
                 reply_markup=build_inline_menu(channel_kb)
@@ -81,6 +131,12 @@ class SettingsHandler(MenuHandler):
     def register(self):
         self.dp.message.register(self.open_settings, lambda m: m.text == "⚙️ Настройки")
         self.dp.callback_query.register(self.callback, lambda c: c.data.startswith("settings:"))
+        self.dp.message.register(
+            self.get_channel,
+            SettingsState.waiting_channel
+        )
+
+
 
 # --- Функции администрирования ---
 # class AdminHandler():

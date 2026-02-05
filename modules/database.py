@@ -6,11 +6,7 @@ DB_PATH = Path("../data/bot.db")
 
 def connect_db():
     try:
-        DB_PATH.parent.mkdir(exist_ok=True)
-
         conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row  # удобно потом
-
         print("✅ SQLite подключена:", DB_PATH.resolve())
         return conn
 
@@ -33,16 +29,18 @@ def create_table():
     value TEXT
     );
     INSERT OR IGNORE INTO Settings (id, name, value) VALUES
-        (0, 'SOURCE_CHANNEL', '@my_brak'),
-        (1, 'SIGNATURE', '@pnewsgg'),
-        (2, 'MODE', 'REVIEW'),
-        (3, 'OPENROUTER_API_KEY', 'YOUR_API_KEY'),
-        (4, 'OPENROUTER_MODEL_NAME', 'openai/gpt-4o-mini');
+        (0, 'SIGNATURE', '@pnewsgg'),
+        (1, 'MODE', 'REVIEW'),
+        (2, 'OPENROUTER_API_KEY', 'YOUR_API_KEY'),
+        (3, 'OPENROUTER_MODEL_NAME', 'openai/gpt-4o-mini'),
+        (4, 'DESTINATION_CHANNEL', '@pnewsgg');
+    INSERT OR IGNORE INTO Channels (id, name) VALUES
+        (0, '@my_brak'),
+        (1, '@whackdoor');
     ''')
     conn.commit()
     conn.close()
 
-create_table()
 # db = connect_db()
 # cursor = db.cursor()
 # cursor.execute("SELECT 1")
