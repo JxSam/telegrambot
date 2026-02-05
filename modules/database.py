@@ -7,7 +7,7 @@ DB_PATH = Path("../data/bot.db")
 def connect_db():
     try:
         conn = sqlite3.connect(DB_PATH)
-        print("✅ SQLite подключена:", DB_PATH.resolve())
+
         return conn
 
     except Exception as e:
@@ -40,6 +40,7 @@ def create_table():
     ''')
     conn.commit()
     conn.close()
+
 
 # db = connect_db()
 # cursor = db.cursor()

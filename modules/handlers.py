@@ -109,13 +109,13 @@ class SettingsHandler(MenuHandler):
             await callback.message.edit_text(
                 "Пришлите ссылку на канал @channel_name"
             )
-            self.execute = "DELETE FROM Channels WHERE name = '{}'"
+            self.execute = "UPDATE Settings SET value = '{}' WHERE name = 'DESTINATION_CHANNEL'"
             await state.set_state(SettingsState.waiting_channel)
 
         elif action == "settings:channel":
             conn = connect_db()
             cursor = conn.cursor()
-            cursor.execute('SELECT value FROM Settings WHERE id = 5')
+            cursor.execute('SELECT value FROM Settings WHERE name = "DESTINATION_CHANNEL"')
             channel = cursor.fetchall()[0][0]
             conn.close()
             await callback.message.edit_text(
