@@ -20,6 +20,8 @@ channel_kb = [
     [types.InlineKeyboardButton(text="⬅️ Назад", callback_data="settings:back")]
 ]
 
+
+# --- Функции для меню ---
 def build_reply_menu(keyboard):
     """Клавиатура для кнопок под полем ввода"""
     return types.ReplyKeyboardMarkup(
@@ -27,14 +29,12 @@ def build_reply_menu(keyboard):
         resize_keyboard=True
     )
 
-# --- Функции для меню ---
 def build_inline_menu(keyboard):
     """Клавиатура для кнопок под сообщением"""
     return types.InlineKeyboardMarkup(
         inline_keyboard=keyboard,
         resize_keyboard=True
     )
-
 
 def build_variable_list(channels: list[str]):
     keyboard = [

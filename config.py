@@ -16,7 +16,6 @@ API_HASH = "eae79b2a0476a5af0aaa4e55d7615efe"
 BOT_TOKEN = "8566777029:AAE7uEGvY5aVzKHHcXbsVpK7dEXvCiwpIKk"
 
 # Добавьте ваш облачный пароль (2FA) сюда!
-# Если у вас НЕТ 2FA, оставьте эту переменную пустой строкой: TELEGRAM_PASSWORD = ""
 TELEGRAM_PASSWORD = "JohnyX2003"
 
 # Каналы
