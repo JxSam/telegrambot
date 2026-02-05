@@ -18,6 +18,7 @@ from utils import *
 class MenuHandler:
     def __init__(self, dp: Dispatcher):
         self.dp = dp
+        self.execute = ""
 
     async def start(self, message: types.Message):
         await message.answer(
@@ -58,9 +59,7 @@ class SettingsHandler(MenuHandler):
 
         conn = connect_db()
         cursor = conn.cursor()
-        cursor.execute(
-            f'UPDATE Settings SET value = "{channel}" WHERE id = 5'
-        )
+        cursor.execute(self.execute.format(channel))
         conn.commit()
         conn.close()
 
@@ -70,7 +69,6 @@ class SettingsHandler(MenuHandler):
     async def callback(self, callback: types.CallbackQuery, state: FSMContext):
         data = callback.data.split("?")
         action = data[0]
-        print("ACTION =", repr(action))
 
         if action == "settings:channel_actions":
             channel = data[1]
@@ -100,10 +98,18 @@ class SettingsHandler(MenuHandler):
                 reply_markup=build_variable_list()
             )
 
+        elif action == "settings:channel_add":
+            await callback.message.edit_text(
+                "Пришлите ссылку на канал @channel_name"
+            )
+            self.execute = "INSERT OR IGNORE INTO Channels (name) VALUES ('{}')"
+            await state.set_state(SettingsState.waiting_channel)
+
         elif action == "settings:channel_edit":
             await callback.message.edit_text(
                 "Пришлите ссылку на канал @channel_name"
             )
+            self.execute = "DELETE FROM Channels WHERE name = '{}'"
             await state.set_state(SettingsState.waiting_channel)
 
         elif action == "settings:channel":
@@ -135,7 +141,6 @@ class SettingsHandler(MenuHandler):
             self.get_channel,
             SettingsState.waiting_channel
         )
-
 
 
 # --- Функции администрирования ---
