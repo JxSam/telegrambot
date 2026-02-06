@@ -28,6 +28,15 @@ class MenuHandler:
             reply_markup=build_reply_menu(main_menu_keyboard)
         )
 
+    async def admin(self, message: types.Message):
+        await message.answer(
+            "📦 Очередь постов: 0\n"
+            "⌛️ Запланировано: 0\n"
+            "✅ Бот слушает каналы и присылает уведомления\n"
+            "👉 Выберите действие\n",
+            reply_markup=build_reply_menu(admin_kb)
+        )
+
     async def show_posts(self, message: types.Message):
         await message.answer(
             "📦 В очереди пока нет постов.",
@@ -36,6 +45,8 @@ class MenuHandler:
 
     def register(self):
         self.dp.message.register(self.start, CommandStart())
+        self.dp.message.register(self.start, lambda m: m.text == "👑 Главное меню")
+        self.dp.message.register(self.admin, lambda m: m.text == "💎 Администрирование")
         self.dp.message.register(self.show_posts, lambda m: m.text == "📬 Показать посты")
 
 # --- Настройки ---

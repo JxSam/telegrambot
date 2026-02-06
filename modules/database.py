@@ -3,22 +3,7 @@ from pathlib import Path
 
 DB_PATH = Path("../data/bot.db")
 
-
-def connect_db():
-    try:
-        conn = sqlite3.connect(DB_PATH)
-
-        return conn
-
-    except Exception as e:
-        print("❌ Ошибка подключения к SQLite:", e)
-        return None
-
-def create_table():
-    conn = connect_db()
-    c = conn.cursor()
-
-    c.executescript('''
+request_base_table = '''
     CREATE TABLE IF NOT EXISTS Channels (
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL
@@ -37,9 +22,41 @@ def create_table():
     INSERT OR IGNORE INTO Channels (id, name) VALUES
         (0, '@my_brak'),
         (1, '@whackdoor');
-    ''')
+    '''
+
+request_post_table = '''
+    CREATE TABLE IF NOT EXISTS Posts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    text TEXT,
+    old_text TEXT
+    );
+    CREATE TABLE PostMedia (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL,
+    file_id TEXT NOT NULL,
+    FOREIGN KEY (post_id) REFERENCES Posts(id) ON DELETE CASCADE
+    );
+    '''
+
+
+def connect_db():
+    try:
+        conn = sqlite3.connect(DB_PATH)
+
+        return conn
+
+    except Exception as e:
+        print("❌ Ошибка подключения к SQLite:", e)
+        return None
+
+def create_table(execute):
+    conn = connect_db()
+    c = conn.cursor()
+
+    c.executescript(execute)
     conn.commit()
     conn.close()
+
 
 
 # db = connect_db()

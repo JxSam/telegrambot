@@ -2,13 +2,16 @@ from aiogram import types
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 from modules.database import connect_db
 
-channels = [
-
-]
 # --- Кнопки ---
 main_menu_keyboard = [
-            [types.KeyboardButton(text="📬 Показать посты")],
-            [types.KeyboardButton(text="⚙️ Настройки")]
+            [types.KeyboardButton(text="💎 Администрирование")],
+            [types.KeyboardButton(text="⚙️ Настройки")],
+]
+
+admin_kb = [
+            [types.KeyboardButton(text="📤 Просмотр очереди"),
+             types.KeyboardButton(text="🕓 Запланированные")],
+            [types.KeyboardButton(text="👑 Главное меню")]
 ]
 
 settings_menu_kb = [
@@ -42,6 +45,7 @@ def build_inline_menu(keyboard):
     )
 
 def build_variable_list():
+    """Функция для списка каналов"""
     channels = []
     conn = connect_db()
     cursor = conn.cursor()
@@ -74,12 +78,14 @@ def build_channel_actions(name_channel):
         ],
         resize_keyboard=True
     )
-# def build_actions_menu(post_id):
-#     actions_builder = InlineKeyboardBuilder()
-#     actions_builder.row(
-#         types.InlineKeyboardButton(text='Показать пост')
-#     )
-#
+
+
+def build_actions_menu(post_id):
+    actions_builder = InlineKeyboardBuilder()
+    actions_builder.row(
+        types.InlineKeyboardButton(text='Показать пост')
+    )
+
 # def build_buttons_post(post_id):
 #     """Клавиатура для действий с постом"""
 #     builder = ReplyKeyboardBuilder()
