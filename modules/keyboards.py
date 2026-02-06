@@ -83,8 +83,9 @@ def build_channel_actions(name_channel):
 def build_actions_menu(post_id):
     actions_builder = InlineKeyboardBuilder()
     actions_builder.row(
-        types.InlineKeyboardButton(text='Показать пост')
+        types.InlineKeyboardButton(text='Показать пост', callback_data="settings:back")
     )
+    return actions_builder
 
 # def build_buttons_post(post_id):
 #     """Клавиатура для действий с постом"""

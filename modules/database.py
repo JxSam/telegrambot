@@ -1,5 +1,15 @@
 import sqlite3
 from pathlib import Path
+from contextlib import contextmanager
+
+@contextmanager
+def get_db():
+    conn = connect_db()
+    try:
+        yield conn
+        conn.commit()
+    finally:
+        conn.close()
 
 DB_PATH = Path("../data/bot.db")
 

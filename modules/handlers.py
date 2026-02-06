@@ -19,6 +19,7 @@ class MenuHandler:
     def __init__(self, dp: Dispatcher):
         self.dp = dp
         self.execute = ""
+        self.chats = []
 
     async def start(self, message: types.Message):
         await message.answer(
@@ -49,11 +50,116 @@ class MenuHandler:
         self.dp.message.register(self.admin, lambda m: m.text == "💎 Администрирование")
         self.dp.message.register(self.show_posts, lambda m: m.text == "📬 Показать посты")
 
+
+# --- Парсер ---
+class ParsHandler:
+    def __init__(self, bot, dp, dir, client):
+        self.bot = bot
+        self.dp = dp
+        self.DOWNLOAD_DIR = dir
+        self.client = client
+        self.chats = []
+
+    def load_channels(self):
+        conn = connect_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM Channels")
+        self.chats = [row[0] for row in cursor.fetchall()]
+        conn.close()
+
+    def reload_event_handler(self):
+        # Удаляем старый
+        self.client.remove_event_handler(self.handler_new_post)
+
+        # Добавляем новый с обновлённым списком
+        self.client.add_event_handler(
+            self.handler_new_post,
+            events.NewMessage(chats=self.chats)
+        )
+
+    async def send_to_review(self, text: str, media_info: str, media_path: str):
+        """
+        Отправляет пост на проверку админу с интерактивными кнопками.
+        """
+        # Уникальный ID поста
+        post_id = hash(text + str(asyncio.get_event_loop().time()))
+
+        review_data = {'text': text, 'media_path': media_path, 'caption': text}
+
+        self.dp['review_posts'][post_id] = review_data
+
+        builder = build_actions_menu(post_id)
+
+        review_message = f"<b>🔥 Новый пост на проверку!</b> {media_info}\n\n" \
+                     f"<i>ID: {post_id}</i>\n" \
+                     "------------------------\n" \
+                     f"{text}"
+
+        if media_path:
+            media_type = media_path.lower().split('.')[-1]
+
+            with open(media_path, 'rb') as media_file:
+                media_data = media_file.read()
+
+            file_input = BufferedInputFile(media_data, filename=os.path.basename(media_path))
+            if media_type in ('png', 'jpg', 'jpeg', 'webp'):
+                await self.bot.send_photo(chat_id=config.ADMIN_ID, photo=file_input, caption=review_message,
+                                     parse_mode=ParseMode.HTML, reply_markup=builder.as_markup())
+            elif media_type in ('mp4', 'mov', 'avi', 'gif', 'webm'):
+                await self.bot.send_video(chat_id=config.ADMIN_ID, video=file_input, caption=review_message,
+                                     parse_mode=ParseMode.HTML, reply_markup=builder.as_markup())
+            else:
+                await self.bot.send_message(chat_id=config.ADMIN_ID, text=review_message, parse_mode=ParseMode.HTML,
+                                       reply_markup=builder.as_markup())
+                await delete_temp_media(media_path)
+                review_data['media_path'] = None
+
+        else:
+            await self.bot.send_message(chat_id=config.ADMIN_ID, text=review_message, parse_mode=ParseMode.HTML,
+                               reply_markup=builder.as_markup())
+
+    # --- Обработчик парсинга (Telethon) ---
+    async def handler_new_post(self, event):
+        """Обрабатывает новое сообщение в любом из исходных каналов."""
+        if not event.message.text and not event.message.media: return
+        post_text = get_html_text(event.message)
+        final_text = post_text + config.SIGNATURE
+        media_path = None
+        media_info = ""
+
+        if event.message.media:
+            ensure_download_dir(self.DOWNLOAD_DIR)
+            media_info = " (с медиа-вложением)"
+            try:
+                media_path = await event.message.download_media(file=self.DOWNLOAD_DIR)
+                print(f"📥 Медиа загружено: {media_path}")
+            except Exception as e:
+                print(f"❌ Ошибка при загрузке медиа: {e}")
+                media_path = None
+
+        print(f"Получен новый пост{media_info} из {event.chat_id}. Режим: {config.MODE}")
+
+        if config.MODE == "AUTO":
+            await self.bot.send_message(chat_id=config.DESTINATION_CHANNEL, text=final_text, parse_mode=ParseMode.HTML)
+            print(f"✅ Пост автоматически опубликован в {config.DESTINATION_CHANNEL}.")
+            if media_path: await delete_temp_media(media_path)
+        elif config.MODE == "REVIEW":
+            await self.send_to_review(final_text, media_info, media_path)
+
+    def register(self):
+        # регистрация обработчика Telethon
+        self.client.add_event_handler(self.handler_new_post, events.NewMessage(chats=self.chats))
+
+
 # --- Настройки ---
 class SettingsState(StatesGroup):
     waiting_channel = State()
 
-class SettingsHandler(MenuHandler):
+class SettingsHandler(MenuHandler, ParsHandler):
+    def __init__(self, dp: Dispatcher, pars_handler: ParsHandler):
+        super().__init__(dp)
+        self.pars_handler = pars_handler
+
     async def open_settings(self, message: types.Message):
         await message.answer(
             "⚙️ <b>Настройки</b>\n\nВыберите пункт:",
@@ -68,11 +174,9 @@ class SettingsHandler(MenuHandler):
             await message.answer("❌ Канал должен быть в формате @channel_name")
             return
 
-        conn = connect_db()
-        cursor = conn.cursor()
-        cursor.execute(self.execute.format(channel))
-        conn.commit()
-        conn.close()
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute(self.execute.format(channel))
 
         await message.answer(f"✅ Канал {channel} сохранён")
         await state.clear()
@@ -92,11 +196,9 @@ class SettingsHandler(MenuHandler):
 
         elif action == "settings:channel_delete":
             channel = data[1]
-            conn = connect_db()
-            cursor = conn.cursor()
-            cursor.execute(f"DELETE FROM Channels WHERE name = '{channel}'")
-            conn.commit()
-            conn.close()
+            with get_db() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM Channels WHERE name = ?", (channel,))
 
             await callback.message.edit_text(
                 f"❌ Канал {channel} удалён"
@@ -115,6 +217,8 @@ class SettingsHandler(MenuHandler):
             )
             self.execute = "INSERT OR IGNORE INTO Channels (name) VALUES ('{}')"
             await state.set_state(SettingsState.waiting_channel)
+            self.pars_handler.load_channels()
+            self.pars_handler.reload_event_handler()
 
         elif action == "settings:channel_edit":
             await callback.message.edit_text(
@@ -124,11 +228,10 @@ class SettingsHandler(MenuHandler):
             await state.set_state(SettingsState.waiting_channel)
 
         elif action == "settings:channel":
-            conn = connect_db()
-            cursor = conn.cursor()
-            cursor.execute('SELECT value FROM Settings WHERE name = "DESTINATION_CHANNEL"')
-            channel = cursor.fetchall()[0][0]
-            conn.close()
+            with get_db() as conn:
+                cursor = conn.cursor()
+                cursor.execute('SELECT value FROM Settings WHERE name = "DESTINATION_CHANNEL"')
+                channel = cursor.fetchall()[0][0]
             await callback.message.edit_text(
                 f"Текущий канал {channel}\n"
                 "Сюда выкладываются посты.",
@@ -152,7 +255,6 @@ class SettingsHandler(MenuHandler):
             self.get_channel,
             SettingsState.waiting_channel
         )
-
 
 # --- Функции администрирования ---
 # class AdminHandler():
@@ -373,86 +475,3 @@ class SettingsHandler(MenuHandler):
 #                 parse_mode=ParseMode.HTML,
 #                 reply_markup=builder.as_markup()
 #             )
-#
-# class ParsHandler():
-#     def __init__(self, bot, dp, dir, client, chats):
-#         self.bot = bot
-#         self.dp = dp
-#         self.DOWNLOAD_DIR = dir
-#         self.client = client
-#         self.chats = chats
-#
-#     async def send_to_review(self, text: str, media_info: str, media_path: str):
-#         """
-#         Отправляет пост на проверку админу с интерактивными кнопками.
-#         """
-#         # Уникальный ID поста
-#         post_id = hash(text + str(asyncio.get_event_loop().time()))
-#
-#         review_data = {'text': text, 'media_path': media_path, 'caption': text}
-#
-#         self.dp['review_posts'][post_id] = review_data
-#
-#         builder = build_buttons_post(post_id)
-#
-#         review_message = f"<b>🔥 Новый пост на проверку!</b> {media_info}\n\n" \
-#                      f"<i>ID: {post_id}</i>\n" \
-#                      "------------------------\n" \
-#                      f"{text}"
-#
-#         if media_path:
-#             media_type = media_path.lower().split('.')[-1]
-#
-#             with open(media_path, 'rb') as media_file:
-#                 media_data = media_file.read()
-#
-#             file_input = BufferedInputFile(media_data, filename=os.path.basename(media_path))
-#             if media_type in ('png', 'jpg', 'jpeg', 'webp'):
-#                 await self.bot.send_photo(chat_id=config.ADMIN_ID, photo=file_input, caption=review_message,
-#                                      parse_mode=ParseMode.HTML, reply_markup=builder.as_markup())
-#             elif media_type in ('mp4', 'mov', 'avi', 'gif', 'webm'):
-#                 await self.bot.send_video(chat_id=config.ADMIN_ID, video=file_input, caption=review_message,
-#                                      parse_mode=ParseMode.HTML, reply_markup=builder.as_markup())
-#             else:
-#                 await self.bot.send_message(chat_id=config.ADMIN_ID, text=review_message, parse_mode=ParseMode.HTML,
-#                                        reply_markup=builder.as_markup())
-#                 await delete_temp_media(media_path)
-#                 review_data['media_path'] = None
-#
-#         else:
-#             await self.bot.send_message(chat_id=config.ADMIN_ID, text=review_message, parse_mode=ParseMode.HTML,
-#                                reply_markup=builder.as_markup())
-#
-#     # --- Обработчик парсинга (Telethon) ---
-#     async def handler_new_post(self, event):
-#         """Обрабатывает новое сообщение в любом из исходных каналов."""
-#
-#         if not event.message.text and not event.message.media: return
-#
-#         post_text = get_html_text(event.message)
-#         final_text = post_text + config.SIGNATURE
-#         media_path = None
-#         media_info = ""
-#
-#         if event.message.media:
-#             ensure_download_dir(self.DOWNLOAD_DIR)
-#             media_info = " (с медиа-вложением)"
-#             try:
-#                 media_path = await event.message.download_media(file=self.DOWNLOAD_DIR)
-#                 print(f"📥 Медиа загружено: {media_path}")
-#             except Exception as e:
-#                 print(f"❌ Ошибка при загрузке медиа: {e}")
-#                 media_path = None
-#
-#         print(f"Получен новый пост{media_info} из {event.chat_id}. Режим: {config.MODE}")
-#
-#         if config.MODE == "AUTO":
-#             await self.bot.send_message(chat_id=config.DESTINATION_CHANNEL, text=final_text, parse_mode=ParseMode.HTML)
-#             print(f"✅ Пост автоматически опубликован в {config.DESTINATION_CHANNEL}.")
-#             if media_path: await delete_temp_media(media_path)
-#         elif config.MODE == "REVIEW":
-#             await self.send_to_review(final_text, media_info, media_path)
-#
-#     def register(self):
-#         # регистрация обработчика Telethon
-#         self.client.add_event_handler(self.handler_new_post, events.NewMessage(chats=self.chats))

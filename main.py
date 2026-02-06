@@ -7,7 +7,7 @@ from aiogram.enums import ParseMode
 from telethon import TelegramClient, events
 import config
 from config import DOWNLOAD_DIR
-from modules.handlers import MenuHandler, SettingsHandler
+from modules.handlers import MenuHandler, SettingsHandler, ParsHandler
 from modules.functions import *
 
 # admin_handler = AdminHandler(bot, dp)
@@ -39,9 +39,12 @@ async def main():
 
     menu = MenuHandler(dp)
     menu.register()
-    settings = SettingsHandler(dp)
+    pars_handler = ParsHandler(bot, dp, DOWNLOAD_DIR, parser_client)
+    pars_handler.load_channels()
+    pars_handler.reload_event_handler()
+    pars_handler.register()
+    settings = SettingsHandler(dp, pars_handler)
     settings.register()
-
     #Создание и проверка наличия папки для скачивания медиа
     ensure_download_dir(DOWNLOAD_DIR)
 
