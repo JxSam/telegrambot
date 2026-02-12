@@ -42,7 +42,7 @@ class MenuHandler:
     async def show_posts(self, message: types.Message):
         conn = connect_db()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM Posts ORDER BY id DESC")
+        cursor.execute("SELECT * FROM Posts ORDER BY post_id DESC")
         posts = cursor.fetchall()
 
         if len(posts) == 0:
@@ -262,7 +262,7 @@ class SettingsHandler(MenuHandler, ParsHandler):
 class AdminHandler(MenuHandler):
     def __init__(self, dp: Dispatcher):
         super().__init__(dp)
-        self.id = 0
+        self.post_id = 0
 
     async def callback_post(self, callback: types.CallbackQuery, state: FSMContext):
         data = callback.data.split("%$")
@@ -270,19 +270,21 @@ class AdminHandler(MenuHandler):
         action = data[0]
 
         if action == "post:check":
-            post_id = data[1]
+            self.post_id = data[1]
             text = data[2]
-            await callback.message.edit_text(
-                f"<b>Post = {post_id}</b>\n"
-                f"Text = {text}"
+            await callback.message.answer(
+                f"<b>Post = {self.post_id}</b>\n"
+                f"Text = {text}",
+                reply_markup=build_reply_menu(read_buttons)
             )
+
         elif action == "post:round_check":
             conn = connect_db()
             cursor = conn.cursor()
 
             cursor.execute("""
                     SELECT * FROM Posts
-                    ORDER BY id ASC
+                    ORDER BY post_id ASC
                     LIMIT 1
                 """)
             data = cursor.fetchone()
@@ -294,13 +296,11 @@ class AdminHandler(MenuHandler):
                 await callback.answer()
                 return
 
-            self.id = data[0]  # сохраняем текущий id
-
-            post_id = data[1]
+            self.post_id = data[1]  # сохраняем текущий id
             text = data[2]
 
             await callback.message.answer(
-                f"<b>Post = {post_id}</b>\n"
+                f"<b>Post = {self.post_id}</b>\n"
                 f"Text = {text}",
                 reply_markup=build_reply_menu(next_posts)
             )
@@ -313,10 +313,10 @@ class AdminHandler(MenuHandler):
 
         cursor.execute("""
             SELECT * FROM Posts
-            WHERE id > ?
-            ORDER BY id
+            WHERE post_id > ?
+            ORDER BY post_id
             LIMIT 1
-        """, (self.id,))
+        """, (self.post_id,))
 
         data = cursor.fetchone()
         conn.close()
@@ -325,12 +325,11 @@ class AdminHandler(MenuHandler):
             await message.answer("🚫 Нет следующих постов")
             return
 
-        self.id = data[0]
-        post_id = data[1]
+        self.post_id = data[1]
         text = data[2]
 
         await message.answer(
-            f"<b>Post = {post_id}</b>\n"
+            f"<b>Post = {self.post_id}</b>\n"
             f"Text = {text}",
             reply_markup=build_reply_menu(next_posts)
         )
@@ -341,10 +340,10 @@ class AdminHandler(MenuHandler):
 
         cursor.execute("""
             SELECT * FROM Posts
-            WHERE id < ?
-            ORDER BY id DESC
+            WHERE post_id < ?
+            ORDER BY post_id DESC
             LIMIT 1
-        """, (self.id,))
+        """, (self.post_id,))
 
         data = cursor.fetchone()
         conn.close()
@@ -353,12 +352,11 @@ class AdminHandler(MenuHandler):
             await message.answer("🚫 Нет предыдущих постов")
             return
 
-        self.id = data[0]
-        post_id = data[1]
+        self.post_id = data[1]
         text = data[2]
 
         await message.answer(
-            f"<b>Post = {post_id}</b>\n"
+            f"<b>Post = {self.post_id}</b>\n"
             f"Text = {text}",
             reply_markup=build_reply_menu(next_posts)
         )
@@ -366,11 +364,11 @@ class AdminHandler(MenuHandler):
     async def delete_post(self, message: types.Message):
         conn = connect_db()
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM Posts WHERE id = ?", (self.id,))
+        cursor.execute("DELETE FROM Posts WHERE post_id = ?", (self.post_id,))
         conn.commit()
         conn.close()
         await message.answer(
-            f'🗑️ <b>Пост удален.</b> (ID: {self.id})',
+            f'🗑️ <b>Пост удален.</b> (ID: {self.post_id})',
             reply_markup=build_reply_menu(next_posts)
         )
 
@@ -379,9 +377,9 @@ class AdminHandler(MenuHandler):
         cursor = conn.cursor()
         cursor.execute("""
                     SELECT * FROM Posts
-                    WHERE id = ?
-                    ORDER BY id DESC
-                """, (self.id,))
+                    WHERE post_id = ?
+                    ORDER BY post_id DESC
+                """, (self.post_id,))
 
         data = cursor.fetchone()
         conn.close()
@@ -389,7 +387,7 @@ class AdminHandler(MenuHandler):
             await message.answer("🚫 Ошибка, отсутствует")
             return
 
-        self.id = data[0]
+        self.post_id = data[0]
         post_id = data[1]
         text = data[2]
 

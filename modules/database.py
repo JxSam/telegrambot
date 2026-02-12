@@ -35,18 +35,20 @@ request_base_table = '''
     '''
 
 request_post_table = '''
-    CREATE TABLE IF NOT EXISTS Posts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    post_id INTEGER,
+    CREATE TABLE IF NOT EXISTS posts (
+    post_id INTEGER GENERATED ALWAYS PRIMARY KEY,
     text TEXT,
     old_text TEXT
-    );
-    CREATE TABLE PostMedia (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+);
+CREATE TABLE IF NOT EXISTS post_media (
+    id INTEGER GENERATED ALWAYS PRIMARY KEY,
     post_id INTEGER NOT NULL,
     file_id TEXT NOT NULL,
-    FOREIGN KEY (post_id) REFERENCES Posts(id) ON DELETE CASCADE
-    );
+    CONSTRAINT fk_post
+        FOREIGN KEY (post_id)
+        REFERENCES posts(post_id)
+        ON DELETE CASCADE
+);
     '''
 
 def connect_db():
@@ -67,6 +69,7 @@ def create_table(execute):
     conn.commit()
     conn.close()
 
+create_table(request_post_table)
 
 # db = connect_db()
 # cursor = db.cursor()

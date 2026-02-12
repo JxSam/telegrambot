@@ -123,15 +123,3 @@ def build_next_posts():
         keyboard=keyboard,
         resize_keyboard=True
     )
-# def build_buttons_post(post_id):
-#     """Клавиатура для действий с постом"""
-#     builder = ReplyKeyboardBuilder()
-#     builder.row(
-#         types.KeyboardButton(text="✨ Уникализация (AI)", callback_data=f"ai_unique_{post_id}"),
-#         types.KeyboardButton(text="✏️ Редактировать", callback_data=f"edit_{post_id}")
-#     )
-#     builder.row(
-#         types.KeyboardButton(text="✅ Опубликовать", callback_data=f"publish_{post_id}"),
-#         types.KeyboardButton(text="🗑️ Удалить", callback_data=f"delete_{post_id}")
-#     )
-#     return builder
