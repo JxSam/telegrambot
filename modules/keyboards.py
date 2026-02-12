@@ -11,7 +11,8 @@ main_menu_keyboard = [
 admin_kb = [
             [types.KeyboardButton(text="📤 Просмотр очереди"),
              types.KeyboardButton(text="🕓 Запланированные")],
-            [types.KeyboardButton(text="👑 Главное меню")]
+            [types.KeyboardButton(text="🌐 Главное меню"),
+             types.KeyboardButton(text="⚙️ Настройки")]
 ]
 
 settings_menu_kb = [
@@ -24,10 +25,30 @@ channel_kb = [
     [types.InlineKeyboardButton(text="⬅️ Назад", callback_data="settings:back")]
 ]
 
+check_posts = [
+    [types.InlineKeyboardButton(text="Смотреть пост", callback_data="post:round_check"),
+     types.InlineKeyboardButton(text="Cмотреть все", callback_data="settings:back")],
+]
+
+next_posts = [
+    [types.KeyboardButton(text="⬅️ Предыдущий"),
+     types.KeyboardButton(text="➡️ Следующий")],
+    [types.KeyboardButton(text="️️️✏️ Редактировать"),
+     types.KeyboardButton(text="❌ Удалить")],
+    [types.KeyboardButton(text="🌐 Главное меню")]
+]
+
 back_button = [
     [types.InlineKeyboardButton(text="⬅️ Назад", callback_data="settings:back")]
 ]
 
+read_buttons = [
+    [types.KeyboardButton(text="✨ Уникализация (AI)"),
+         types.KeyboardButton(text="✏️ Изменить текст")],
+    [types.KeyboardButton(text="✅ Опубликовать"),
+         types.KeyboardButton(text="❌ Удалить")],
+    [types.KeyboardButton(text='🌐 Главное меню')]
+]
 
 # --- Функции для меню ---
 def build_reply_menu(keyboard):
@@ -80,13 +101,28 @@ def build_channel_actions(name_channel):
     )
 
 
-def build_actions_menu(post_id):
+def build_actions_menu(post_id, text):
     actions_builder = InlineKeyboardBuilder()
     actions_builder.row(
-        types.InlineKeyboardButton(text='Показать пост', callback_data="settings:back")
+        types.InlineKeyboardButton(text='Показать пост', callback_data=f"post:check%${post_id}%${text}")
     )
     return actions_builder
 
+def build_round_posts(post_id):
+    actions_builder = InlineKeyboardBuilder()
+    actions_builder.row(
+        types.InlineKeyboardButton(text='Следующий пост', callback_data=f"post:check%${post_id}")
+    )
+    return actions_builder
+
+def build_next_posts():
+    keyboard = [
+        [types.KeyboardButton(text='SQ')]
+    ]
+    return types.ReplyKeyboardMarkup(
+        keyboard=keyboard,
+        resize_keyboard=True
+    )
 # def build_buttons_post(post_id):
 #     """Клавиатура для действий с постом"""
 #     builder = ReplyKeyboardBuilder()

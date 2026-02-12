@@ -37,6 +37,7 @@ request_base_table = '''
 request_post_table = '''
     CREATE TABLE IF NOT EXISTS Posts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER,
     text TEXT,
     old_text TEXT
     );
@@ -47,7 +48,6 @@ request_post_table = '''
     FOREIGN KEY (post_id) REFERENCES Posts(id) ON DELETE CASCADE
     );
     '''
-
 
 def connect_db():
     try:
@@ -66,7 +66,6 @@ def create_table(execute):
     c.executescript(execute)
     conn.commit()
     conn.close()
-
 
 
 # db = connect_db()

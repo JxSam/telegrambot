@@ -1,5 +1,6 @@
 import asyncio
 import os
+from multiprocessing import connection
 
 from aiogram import Dispatcher
 from aiogram.fsm.context import FSMContext
@@ -39,17 +40,27 @@ class MenuHandler:
         )
 
     async def show_posts(self, message: types.Message):
-        await message.answer(
-            "📦 В очереди пока нет постов.",
-            reply_markup=build_reply_menu(main_menu_keyboard)
-        )
+        conn = connect_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM Posts ORDER BY id DESC")
+        posts = cursor.fetchall()
+
+        if len(posts) == 0:
+            await message.answer(
+                "📦 В очереди пока нет постов."
+            )
+        else:
+            await message.answer(
+                f"📦 В очереди: {len(posts)} постов\n\n"
+                f"👉 Выберите действие:",
+                reply_markup=build_inline_menu(check_posts)
+            )
 
     def register(self):
         self.dp.message.register(self.start, CommandStart())
-        self.dp.message.register(self.start, lambda m: m.text == "👑 Главное меню")
+        self.dp.message.register(self.admin, lambda m: m.text == "🌐 Главное меню")
         self.dp.message.register(self.admin, lambda m: m.text == "💎 Администрирование")
-        self.dp.message.register(self.show_posts, lambda m: m.text == "📬 Показать посты")
-
+        self.dp.message.register(self.show_posts, lambda m: m.text == "📤 Просмотр очереди")
 
 # --- Парсер ---
 class ParsHandler:
@@ -67,16 +78,6 @@ class ParsHandler:
         self.chats = [row[0] for row in cursor.fetchall()]
         conn.close()
 
-    def reload_event_handler(self):
-        # Удаляем старый
-        self.client.remove_event_handler(self.handler_new_post)
-
-        # Добавляем новый с обновлённым списком
-        self.client.add_event_handler(
-            self.handler_new_post,
-            events.NewMessage(chats=self.chats)
-        )
-
     async def send_to_review(self, text: str, media_info: str, media_path: str):
         """
         Отправляет пост на проверку админу с интерактивными кнопками.
@@ -88,12 +89,17 @@ class ParsHandler:
 
         self.dp['review_posts'][post_id] = review_data
 
-        builder = build_actions_menu(post_id)
+        builder = build_actions_menu(post_id, text)
 
         review_message = f"<b>🔥 Новый пост на проверку!</b> {media_info}\n\n" \
                      f"<i>ID: {post_id}</i>\n" \
-                     "------------------------\n" \
-                     f"{text}"
+                     "------------------------\n"
+
+        conn = connect_db()
+        cursor = conn.cursor()
+        cursor.execute(f"INSERT INTO Posts (post_id, text) VALUES ('{post_id}', '{text}')")
+        conn.commit()
+        conn.close()
 
         if media_path:
             media_type = media_path.lower().split('.')[-1]
@@ -149,7 +155,6 @@ class ParsHandler:
     def register(self):
         # регистрация обработчика Telethon
         self.client.add_event_handler(self.handler_new_post, events.NewMessage(chats=self.chats))
-
 
 # --- Настройки ---
 class SettingsState(StatesGroup):
@@ -217,8 +222,6 @@ class SettingsHandler(MenuHandler, ParsHandler):
             )
             self.execute = "INSERT OR IGNORE INTO Channels (name) VALUES ('{}')"
             await state.set_state(SettingsState.waiting_channel)
-            self.pars_handler.load_channels()
-            self.pars_handler.reload_event_handler()
 
         elif action == "settings:channel_edit":
             await callback.message.edit_text(
@@ -255,6 +258,162 @@ class SettingsHandler(MenuHandler, ParsHandler):
             self.get_channel,
             SettingsState.waiting_channel
         )
+
+class AdminHandler(MenuHandler):
+    def __init__(self, dp: Dispatcher):
+        super().__init__(dp)
+        self.id = 0
+
+    async def callback_post(self, callback: types.CallbackQuery, state: FSMContext):
+        data = callback.data.split("%$")
+        print(data)
+        action = data[0]
+
+        if action == "post:check":
+            post_id = data[1]
+            text = data[2]
+            await callback.message.edit_text(
+                f"<b>Post = {post_id}</b>\n"
+                f"Text = {text}"
+            )
+        elif action == "post:round_check":
+            conn = connect_db()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                    SELECT * FROM Posts
+                    ORDER BY id ASC
+                    LIMIT 1
+                """)
+            data = cursor.fetchone()
+
+            conn.close()
+
+            if not data:
+                await callback.message.answer("🚫 Постов нет")
+                await callback.answer()
+                return
+
+            self.id = data[0]  # сохраняем текущий id
+
+            post_id = data[1]
+            text = data[2]
+
+            await callback.message.answer(
+                f"<b>Post = {post_id}</b>\n"
+                f"Text = {text}",
+                reply_markup=build_reply_menu(next_posts)
+            )
+
+            await callback.answer()
+
+    async def round_next_post(self, message: types.Message):
+        conn = connect_db()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT * FROM Posts
+            WHERE id > ?
+            ORDER BY id
+            LIMIT 1
+        """, (self.id,))
+
+        data = cursor.fetchone()
+        conn.close()
+
+        if not data:
+            await message.answer("🚫 Нет следующих постов")
+            return
+
+        self.id = data[0]
+        post_id = data[1]
+        text = data[2]
+
+        await message.answer(
+            f"<b>Post = {post_id}</b>\n"
+            f"Text = {text}",
+            reply_markup=build_reply_menu(next_posts)
+        )
+
+    async def round_prev_post(self, message: types.Message):
+        conn = connect_db()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT * FROM Posts
+            WHERE id < ?
+            ORDER BY id DESC
+            LIMIT 1
+        """, (self.id,))
+
+        data = cursor.fetchone()
+        conn.close()
+
+        if not data:
+            await message.answer("🚫 Нет предыдущих постов")
+            return
+
+        self.id = data[0]
+        post_id = data[1]
+        text = data[2]
+
+        await message.answer(
+            f"<b>Post = {post_id}</b>\n"
+            f"Text = {text}",
+            reply_markup=build_reply_menu(next_posts)
+        )
+
+    async def delete_post(self, message: types.Message):
+        conn = connect_db()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM Posts WHERE id = ?", (self.id,))
+        conn.commit()
+        conn.close()
+        await message.answer(
+            f'🗑️ <b>Пост удален.</b> (ID: {self.id})',
+            reply_markup=build_reply_menu(next_posts)
+        )
+
+    async def read_post(self, message: types.Message):
+        conn = connect_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+                    SELECT * FROM Posts
+                    WHERE id = ?
+                    ORDER BY id DESC
+                """, (self.id,))
+
+        data = cursor.fetchone()
+        conn.close()
+        if not data:
+            await message.answer("🚫 Ошибка, отсутствует")
+            return
+
+        self.id = data[0]
+        post_id = data[1]
+        text = data[2]
+
+        await message.answer(
+            f"<b>✏️ Редактирование поста. Текст:</b>\n\n"
+            f"{text}",
+            reply_markup=build_reply_menu(read_buttons)
+        )
+
+    async def read_post_text(self, message: types.Message):
+        await message.answer(
+            f"<b>✏️ Пришлите новый текст</b>"
+        )
+
+
+
+    def register(self):
+        self.dp.callback_query.register(self.callback_post, lambda c: c.data.startswith("post:"))
+        self.dp.message.register(self.round_next_post, lambda m: m.text == "➡️ Следующий")
+        self.dp.message.register(self.round_prev_post, lambda m: m.text == "⬅️ Предыдущий")
+        self.dp.message.register(self.delete_post, lambda m: m.text == "❌ Удалить")
+        self.dp.message.register(self.read_post, lambda m: m.text == "️️️✏️ Редактировать")
+        self.dp.message.register(self.read_post_text, lambda m: m.text == "✏️ Изменить текст")
+
 
 # --- Функции администрирования ---
 # class AdminHandler():
