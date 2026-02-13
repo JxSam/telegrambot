@@ -2,7 +2,7 @@ import asyncio
 import os
 from multiprocessing import connection
 
-from aiogram import Dispatcher
+from aiogram import Dispatcher, Router
 from aiogram.fsm.context import FSMContext
 from telethon import events
 from modules.database import *
@@ -263,6 +263,7 @@ class AdminHandler(MenuHandler):
     def __init__(self, dp: Dispatcher):
         super().__init__(dp)
         self.post_id = 0
+        self.waiting_edit_message_id = None
 
     async def callback_post(self, callback: types.CallbackQuery, state: FSMContext):
         data = callback.data.split("%$")
@@ -296,7 +297,7 @@ class AdminHandler(MenuHandler):
                 await callback.answer()
                 return
 
-            self.post_id = data[1]  # сохраняем текущий id
+            self.post_id = data[1]
             text = data[2]
 
             await callback.message.answer(
@@ -387,8 +388,7 @@ class AdminHandler(MenuHandler):
             await message.answer("🚫 Ошибка, отсутствует")
             return
 
-        self.post_id = data[0]
-        post_id = data[1]
+        self.post_id = data[1]
         text = data[2]
 
         await message.answer(
@@ -398,10 +398,36 @@ class AdminHandler(MenuHandler):
         )
 
     async def read_post_text(self, message: types.Message):
-        await message.answer(
-            f"<b>✏️ Пришлите новый текст</b>"
+
+        msg = await message.answer(
+            "✏️ Пришлите новый текст ответом на это сообщение"
         )
 
+        self.waiting_edit_message_id = msg.message_id
+
+    async def handle_edit_reply(self, message: types.Message):
+
+        if not message.reply_to_message:
+            return
+
+        if message.reply_to_message.message_id != self.waiting_edit_message_id:
+            return
+
+        new_text = message.text
+        conn = connect_db()
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE Posts SET text = ? WHERE post_id = ?",
+            (new_text, self.post_id)
+        )
+        print(cursor)
+        conn.commit()
+        conn.close()
+
+        await message.answer("✅ Текст обновлён\n"
+                             f"{new_text}")
+
+        self.waiting_edit_message_id = None
 
 
     def register(self):
@@ -411,7 +437,27 @@ class AdminHandler(MenuHandler):
         self.dp.message.register(self.delete_post, lambda m: m.text == "❌ Удалить")
         self.dp.message.register(self.read_post, lambda m: m.text == "️️️✏️ Редактировать")
         self.dp.message.register(self.read_post_text, lambda m: m.text == "✏️ Изменить текст")
+        self.dp.message.register(self.handle_edit_reply)
 
+class DeleteStates(StatesGroup):
+    waiting_reason = State()
+
+class DeleteHandler:
+    def __init__(self):
+        self.router = Router()
+        self.register_handlers()
+
+    def register_handlers(self):
+        self.router.message.register(self.get_reason, DeleteStates.waiting_reason)
+
+    async def ask_reason(self, message: types.Message, state: FSMContext):
+        await state.set_state(DeleteStates.waiting_reason)
+        await message.answer("Напиши причину удаления:")
+
+    async def get_reason(self, message: types.Message, state: FSMContext):
+        reason = message.text
+        await message.answer(f"Причина: {reason}")
+        await state.clear()
 
 # --- Функции администрирования ---
 # class AdminHandler():
