@@ -75,3 +75,4 @@ create_table(request_post_table)
 # cursor = db.cursor()
 # cursor.execute("SELECT 1")
 # print("🟢 Проверка запроса: OK")
+#
