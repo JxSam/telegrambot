@@ -260,10 +260,12 @@ class SettingsHandler(MenuHandler, ParsHandler):
         )
 
 class AdminHandler(MenuHandler):
-    def __init__(self, dp: Dispatcher):
+    def __init__(self, dp: Dispatcher, bot):
         super().__init__(dp)
         self.post_id = 0
         self.waiting_edit_message_id = None
+        self.bot = bot
+        self.text = str
 
     async def callback_post(self, callback: types.CallbackQuery, state: FSMContext):
         data = callback.data.split("%$")
@@ -272,10 +274,10 @@ class AdminHandler(MenuHandler):
 
         if action == "post:check":
             self.post_id = data[1]
-            text = data[2]
+            self.text = data[2]
             await callback.message.answer(
                 f"<b>Post = {self.post_id}</b>\n"
-                f"Text = {text}",
+                f"Text = {self.text}",
                 reply_markup=build_reply_menu(read_buttons)
             )
 
@@ -298,11 +300,11 @@ class AdminHandler(MenuHandler):
                 return
 
             self.post_id = data[1]
-            text = data[2]
+            self.text = data[2]
 
             await callback.message.answer(
                 f"<b>Post = {self.post_id}</b>\n"
-                f"Text = {text}",
+                f"Text = {self.text}",
                 reply_markup=build_reply_menu(next_posts)
             )
 
@@ -327,11 +329,11 @@ class AdminHandler(MenuHandler):
             return
 
         self.post_id = data[1]
-        text = data[2]
+        self.text = data[2]
 
         await message.answer(
             f"<b>Post = {self.post_id}</b>\n"
-            f"Text = {text}",
+            f"Text = {self.text}",
             reply_markup=build_reply_menu(next_posts)
         )
 
@@ -354,13 +356,36 @@ class AdminHandler(MenuHandler):
             return
 
         self.post_id = data[1]
-        text = data[2]
+        self.text = data[2]
 
         await message.answer(
             f"<b>Post = {self.post_id}</b>\n"
-            f"Text = {text}",
+            f"Text = {self.text}",
             reply_markup=build_reply_menu(next_posts)
         )
+
+    async def publish_post(self, message: types.Message):    # 2. Публикация в целевой канал
+            sent_message = await self.bot.send_message(
+                chat_id=config.DESTINATION_CHANNEL,
+                text=self.text,
+                parse_mode=ParseMode.HTML
+            )
+            if sent_message.chat.username:
+                post_link = f"https://t.me/{sent_message.chat.username}/{sent_message.message_id}"
+            else:
+                # приватный канал
+                chat_id = str(sent_message.chat.id).replace("-100", "")
+                post_link = f"https://t.me/c/{chat_id}/{sent_message.message_id}"
+            await message.answer(
+                f'<b>✅ Опубликовано\n</b>'
+                f'Link = {post_link}',
+                parse_mode=ParseMode.HTML
+            )
+            conn = connect_db()
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM Posts WHERE post_id = ?", (self.post_id,))
+            conn.commit()
+            conn.close()
 
     async def delete_post(self, message: types.Message):
         conn = connect_db()
@@ -389,11 +414,12 @@ class AdminHandler(MenuHandler):
             return
 
         self.post_id = data[1]
-        text = data[2]
+        self.text = data[2]
 
         await message.answer(
-            f"<b>✏️ Редактирование поста. Текст:</b>\n\n"
-            f"{text}",
+            f"<b>️️️⚡️️ Редактирование. Текст:</b>\n"
+            "------------------------\n"
+            f"{self.text}",
             reply_markup=build_reply_menu(read_buttons)
         )
 
@@ -413,19 +439,21 @@ class AdminHandler(MenuHandler):
         if message.reply_to_message.message_id != self.waiting_edit_message_id:
             return
 
-        new_text = message.text
+        self.text = message.text
         conn = connect_db()
         cursor = conn.cursor()
         cursor.execute(
             "UPDATE Posts SET text = ? WHERE post_id = ?",
-            (new_text, self.post_id)
+            (self.text, self.post_id)
         )
         print(cursor)
         conn.commit()
         conn.close()
 
-        await message.answer("✅ Текст обновлён\n"
-                             f"{new_text}")
+        await message.answer(f"✅ <b>ТЕКСТ ОБНОВЛЕН!</b>\n\n"
+                "------------------------\n"
+                f"{self.text}",
+                parse_mode=ParseMode.HTML,)
 
         self.waiting_edit_message_id = None
 
@@ -435,8 +463,9 @@ class AdminHandler(MenuHandler):
         self.dp.message.register(self.round_next_post, lambda m: m.text == "➡️ Следующий")
         self.dp.message.register(self.round_prev_post, lambda m: m.text == "⬅️ Предыдущий")
         self.dp.message.register(self.delete_post, lambda m: m.text == "❌ Удалить")
-        self.dp.message.register(self.read_post, lambda m: m.text == "️️️✏️ Редактировать")
+        self.dp.message.register(self.read_post, lambda m: m.text == "️️️⚡️ Действия")
         self.dp.message.register(self.read_post_text, lambda m: m.text == "✏️ Изменить текст")
+        self.dp.message.register(self.publish_post, lambda m: m.text == "✅ Опубликовать")
         self.dp.message.register(self.handle_edit_reply)
 
 class DeleteStates(StatesGroup):
@@ -678,4 +707,3 @@ class DeleteHandler:
 #                 parse_mode=ParseMode.HTML,
 #                 reply_markup=builder.as_markup()
 #             )
-#

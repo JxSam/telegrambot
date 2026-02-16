@@ -33,7 +33,7 @@ check_posts = [
 next_posts = [
     [types.KeyboardButton(text="⬅️ Предыдущий"),
      types.KeyboardButton(text="➡️ Следующий")],
-    [types.KeyboardButton(text="️️️✏️ Редактировать"),
+    [types.KeyboardButton(text="️️️⚡️ Действия"),
      types.KeyboardButton(text="❌ Удалить")],
     [types.KeyboardButton(text="🌐 Главное меню")]
 ]
@@ -123,4 +123,3 @@ def build_next_posts():
         keyboard=keyboard,
         resize_keyboard=True
     )
-#
