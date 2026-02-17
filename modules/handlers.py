@@ -379,7 +379,8 @@ class AdminHandler(MenuHandler):
             await message.answer(
                 f'<b>✅ Опубликовано\n</b>'
                 f'Link = {post_link}',
-                parse_mode=ParseMode.HTML
+                parse_mode=ParseMode.HTML,
+                reply_markup=build_reply_menu(admin_kb)
             )
             conn = connect_db()
             cursor = conn.cursor()

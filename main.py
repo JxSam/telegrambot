@@ -30,7 +30,7 @@ async def main():
     pars_handler.register()
     settings = SettingsHandler(dp, pars_handler)
     settings.register()
-    admin = AdminHandler(dp)
+    admin = AdminHandler(dp, bot)
     admin.register()
     #Создание и проверка наличия папки для скачивания медиа
     ensure_download_dir(DOWNLOAD_DIR)
