@@ -68,10 +68,3 @@ def create_table(execute):
     c.executescript(execute)
     conn.commit()
     conn.close()
-
-create_table(request_post_table)
-
-# db = connect_db()
-# cursor = db.cursor()
-# cursor.execute("SELECT 1")
-# print("🟢 Проверка запроса: OK")

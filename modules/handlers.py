@@ -91,44 +91,27 @@ class ParsHandler:
 
         builder = build_actions_menu(post_id, text)
 
-        review_message = f"<b>🔥 Новый пост на проверку!</b> {media_info}\n\n" \
+        review_message = f"<b>🔥 Новый пост на проверку!</b>\n\n" \
                      f"<i>ID: {post_id}</i>\n" \
                      "------------------------\n"
-
         conn = connect_db()
         cursor = conn.cursor()
         cursor.execute(f"INSERT INTO Posts (post_id, text) VALUES ('{post_id}', '{text}')")
+        if media_path is not None:
+            cursor.execute(f"INSERT INTO post_media (post_id, file_id) VALUES ('{post_id}', '{media_path}')")
+        cursor.execute("SELECT name FROM Channels")
+        self.chats = [row[0] for row in cursor.fetchall()]
         conn.commit()
         conn.close()
 
-        if media_path:
-            media_type = media_path.lower().split('.')[-1]
-
-            with open(media_path, 'rb') as media_file:
-                media_data = media_file.read()
-
-            file_input = BufferedInputFile(media_data, filename=os.path.basename(media_path))
-            if media_type in ('png', 'jpg', 'jpeg', 'webp'):
-                await self.bot.send_photo(chat_id=config.ADMIN_ID, photo=file_input, caption=review_message,
-                                     parse_mode=ParseMode.HTML, reply_markup=builder.as_markup())
-            elif media_type in ('mp4', 'mov', 'avi', 'gif', 'webm'):
-                await self.bot.send_video(chat_id=config.ADMIN_ID, video=file_input, caption=review_message,
-                                     parse_mode=ParseMode.HTML, reply_markup=builder.as_markup())
-            else:
-                await self.bot.send_message(chat_id=config.ADMIN_ID, text=review_message, parse_mode=ParseMode.HTML,
-                                       reply_markup=builder.as_markup())
-                await delete_temp_media(media_path)
-                review_data['media_path'] = None
-
-        else:
-            await self.bot.send_message(chat_id=config.ADMIN_ID, text=review_message, parse_mode=ParseMode.HTML,
+        await self.bot.send_message(chat_id=config.ADMIN_ID, text=review_message, parse_mode=ParseMode.HTML,
                                reply_markup=builder.as_markup())
 
     # --- Обработчик парсинга (Telethon) ---
     async def handler_new_post(self, event):
         """Обрабатывает новое сообщение в любом из исходных каналов."""
         if not event.message.text and not event.message.media: return
-        post_text = get_html_text(event.message)
+        post_text = event.message.text
         final_text = post_text + config.SIGNATURE
         media_path = None
         media_info = ""
@@ -259,6 +242,7 @@ class SettingsHandler(MenuHandler, ParsHandler):
             SettingsState.waiting_channel
         )
 
+# --- Администрирование ---
 class AdminHandler(MenuHandler):
     def __init__(self, dp: Dispatcher, bot):
         super().__init__(dp)
@@ -274,10 +258,22 @@ class AdminHandler(MenuHandler):
 
         if action == "post:check":
             self.post_id = data[1]
-            self.text = data[2]
+            conn = connect_db()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                                SELECT text FROM Posts
+                                WHERE post_id = ?
+                                ORDER BY post_id ASC
+                                LIMIT 1
+                            """, (self.post_id,))
+            data = cursor.fetchone()
+            self.text = data[0]
+            conn.close()
             await callback.message.answer(
-                f"<b>Post = {self.post_id}</b>\n"
-                f"Text = {self.text}",
+                f"<b>️️️⚡️️ Редактирование {self.post_id}. \nТекст:</b>\n"
+                "------------------------\n"
+                f"{self.text}",
                 reply_markup=build_reply_menu(read_buttons)
             )
 
@@ -468,243 +464,3 @@ class AdminHandler(MenuHandler):
         self.dp.message.register(self.read_post_text, lambda m: m.text == "✏️ Изменить текст")
         self.dp.message.register(self.publish_post, lambda m: m.text == "✅ Опубликовать")
         self.dp.message.register(self.handle_edit_reply)
-
-class DeleteStates(StatesGroup):
-    waiting_reason = State()
-
-class DeleteHandler:
-    def __init__(self):
-        self.router = Router()
-        self.register_handlers()
-
-    def register_handlers(self):
-        self.router.message.register(self.get_reason, DeleteStates.waiting_reason)
-
-    async def ask_reason(self, message: types.Message, state: FSMContext):
-        await state.set_state(DeleteStates.waiting_reason)
-        await message.answer("Напиши причину удаления:")
-
-    async def get_reason(self, message: types.Message, state: FSMContext):
-        reason = message.text
-        await message.answer(f"Причина: {reason}")
-        await state.clear()
-
-# --- Функции администрирования ---
-# class AdminHandler():
-#     def __init__(self, bot, dispatcher):
-#         self.bot = bot
-#         self.dp = dispatcher
-#
-#     async def process_callback_query(self, callback_query: types.CallbackQuery):
-#         """Обработка нажатий на кнопки администрирования."""
-#
-#         data_parts = callback_query.data.split('_')
-#         post_id_str = data_parts[-1]
-#
-#         if len(data_parts) == 3 and data_parts[0] == 'ai' and data_parts[1] == 'unique':
-#             action = 'ai_unique'
-#         elif len(data_parts) == 2:
-#             action = data_parts[0]
-#         else:
-#             await callback_query.answer("❌ Неизвестный формат данных.")
-#             return
-#
-#         try:
-#             post_id = int(post_id_str)
-#         except ValueError:
-#             await callback_query.answer("❌ Некорректный ID поста.")
-#             return
-#
-#         if post_id not in self.dp['review_posts']:
-#             # Пост не найден, удаляем сообщение, чтобы не висело
-#             await callback_query.message.delete()
-#             await callback_query.answer()
-#             return
-#
-#         data = self.dp['review_posts'][post_id]
-#         current_text = data['text']
-#         media_path = data.get('media_path')
-#
-#         is_media_message = callback_query.message.caption is not None
-#
-#         if action == "publish":
-#             # --- ОПУБЛИКОВАТЬ ---
-#             try:
-#                 if is_media_message:
-#                     await callback_query.message.edit_caption(caption=callback_query.message.caption, reply_markup=None,
-#                                                               parse_mode=ParseMode.HTML)
-#                 else:
-#                     await callback_query.message.edit_reply_markup(reply_markup=None)
-#             except Exception:
-#                 pass
-#
-#             try:
-#                 await callback_query.message.edit_caption(caption="⏳ Публикация…", parse_mode=ParseMode.HTML)
-#                 # 2. Публикация в целевой канал
-#                 if media_path and os.path.exists(media_path):
-#                     media_type = media_path.lower().split('.')[-1]
-#
-#                     with open(media_path, 'rb') as media_file:
-#                         media_data = media_file.read()
-#
-#                     file_input = BufferedInputFile(media_data, filename=os.path.basename(media_path))
-#
-#                     if media_type in ('png', 'jpg', 'jpeg', 'webp'):
-#                         sent_message = await self.bot.send_photo(
-#                             chat_id=config.DESTINATION_CHANNEL,
-#                             photo=file_input,
-#                             caption=current_text,
-#                             parse_mode=ParseMode.HTML
-#                         )
-#                     elif media_type in ('mp4', 'mov', 'avi', 'gif', 'webm'):
-#                         sent_message = await self.bot.send_video(
-#                             chat_id=config.DESTINATION_CHANNEL,
-#                             video=file_input,
-#                             caption=current_text,
-#                             parse_mode=ParseMode.HTML
-#                         )
-#                     else:
-#                         sent_message = await self.bot.send_message(
-#                             chat_id=config.DESTINATION_CHANNEL,
-#                             text=current_text,
-#                             parse_mode=ParseMode.HTML
-#                         )
-#                 else:
-#                     sent_message = await self.bot.send_message(
-#                         chat_id=config.DESTINATION_CHANNEL,
-#                         text=current_text,
-#                         parse_mode=ParseMode.HTML
-#                     )
-#                 if sent_message.chat.username:
-#                     post_link = f"https://t.me/{sent_message.chat.username}/{sent_message.message_id}"
-#                 else:
-#                     # приватный канал
-#                     chat_id = str(sent_message.chat.id).replace("-100", "")
-#                     post_link = f"https://t.me/c/{chat_id}/{sent_message.message_id}"
-#
-#                 # 3. Отправляем сообщение об успешности
-#                 await self.bot.send_message(
-#                     callback_query.from_user.id,
-#                     f"✅ <b>Пост опубликован.</b>\n🔗 <a href=\"{post_link}\">Открыть пост</a>",
-#                     parse_mode=ParseMode.HTML,
-#                     disable_web_page_preview=True
-#                 )
-#                 await callback_query.message.delete()
-#
-#             except Exception as e:
-#                 # 4. Обработка ошибки публикации
-#                 unique_suffix = f'&#x200B; (Error ID:{post_id})'
-#                 error_msg = f"❌ Ошибка публикации: {escape_html_entities(str(e))}\n\nОригинал: {current_text}{unique_suffix}"
-#
-#                 if is_media_message:
-#                     await callback_query.message.edit_caption(error_msg, parse_mode=ParseMode.HTML)
-#                 else:
-#                     await callback_query.message.edit_text(error_msg, parse_mode=ParseMode.HTML)
-#
-#             if media_path: await delete_temp_media(media_path)
-#             del self.dp['review_posts'][post_id]
-#
-#         elif action == "delete":
-#             # --- УДАЛИТЬ ---
-#             if media_path: await delete_temp_media(media_path)
-#             del self.dp['review_posts'][post_id]
-#
-#             await callback_query.message.delete()
-#             await self.bot.send_message(callback_query.from_user.id, f"🗑️ <b>Пост удален.</b> (ID: {post_id})",
-#                                    parse_mode=ParseMode.HTML)
-#
-#         elif action == "ai_unique":
-#             clean_text = strip_signature(current_text)
-#             unique_body = await ai_unique_text(clean_text)
-#             final_unique_text = unique_body + config.SIGNATURE
-#
-#             data['text'] = final_unique_text
-#             self.dp['review_posts'][post_id] = data
-#
-#             # 4. Пересобираем клавиатуру
-#             builder = build_buttons_post(post_id)
-#
-#             # 5. Редактируем сообщение (медиа остается, текст обновляется)
-#             final_message = f"🤖 <b>УНИКАЛИЗАЦИЯ ЗАВЕРШЕНА!</b>\n\n" \
-#                             f"<i>ID: {post_id}</i>\n" \
-#                             "------------------------\n" \
-#                             f"{final_unique_text}"
-#
-#             if is_media_message:
-#                 await callback_query.message.edit_caption(caption=final_message, parse_mode=ParseMode.HTML,
-#                                                           reply_markup=builder.as_markup())
-#             else:
-#                 await callback_query.message.edit_text(text=final_message, parse_mode=ParseMode.HTML,
-#                                                        reply_markup=builder.as_markup())
-#
-#         elif action == "edit":
-#             # --- РЕДАКТИРОВАНИЕ ---
-#             builder = InlineKeyboardBuilder()
-#             builder.row(
-#                 types.InlineKeyboardButton(
-#                     text="⬅️ Вернуться",
-#                     callback_data=f"back_{post_id}"
-#                 )
-#             )
-#
-#             # 2. Устанавливаем состояние (текст для запроса ответа)
-#             await callback_query.message.edit_text(
-#                 f"✏️ <b>ОТПРАВЬТЕ НОВЫЙ ТЕКСТ</b> для поста с ID: {post_id_str}. "
-#                 "Ответьте на это сообщение новым текстом.",
-#                 parse_mode=ParseMode.HTML
-#                 , reply_markup=builder.as_markup()
-#             )
-#             self.dp['waiting_for_edit'][callback_query.message.chat.id] = post_id
-#         elif action == "back":
-#             # Сбрасываем режим редактирования
-#             self.dp['waiting_for_edit'].pop(callback_query.message.chat.id, None)
-#
-#             builder = build_buttons_post(post_id)
-#
-#             final_message = (
-#                 f"<i>ID: {post_id}</i>\n"
-#                 "------------------------\n"
-#                 f"{current_text}"
-#             )
-#
-#             if is_media_message:
-#                 await callback_query.message.edit_caption(
-#                     caption=final_message,
-#                     parse_mode=ParseMode.HTML,
-#                     reply_markup=builder.as_markup()
-#                 )
-#             else:
-#                 await callback_query.message.edit_text(
-#                     final_message,
-#                     parse_mode=ParseMode.HTML,
-#                     reply_markup=builder.as_markup()
-#                 )
-#
-#         await callback_query.answer()
-#
-#     async def handle_admin_reply(self, message: types.Message):
-#         """Обрабатывает ответ админа с новым текстом для редактирования."""
-#
-#         if message.chat.id in self.dp['waiting_for_edit'] and message.reply_to_message:
-#             post_id = self.dp['waiting_for_edit'].pop(message.chat.id)
-#
-#             if post_id not in self.dp['review_posts']:
-#                 await message.reply("❌ Ошибка: Пост для редактирования не найден или уже обработан.")
-#                 return
-#
-#             new_text = message.text + config.SIGNATURE
-#
-#             # Обновляем текст
-#             self.dp['review_posts'][post_id]['text'] = new_text
-#
-#             # Пересобираем клавиатуру
-#             builder = build_buttons_post(post_id)
-#
-#             await message.reply(
-#                 f"✅ <b>ТЕКСТ ОБНОВЛЕН!</b>\n\n"
-#                 f"<i>ID: {post_id}</i>\n"
-#                 "------------------------\n"
-#                 f"{new_text}",
-#                 parse_mode=ParseMode.HTML,
-#                 reply_markup=builder.as_markup()
-#             )

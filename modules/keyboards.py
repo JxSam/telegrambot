@@ -104,7 +104,7 @@ def build_channel_actions(name_channel):
 def build_actions_menu(post_id, text):
     actions_builder = InlineKeyboardBuilder()
     actions_builder.row(
-        types.InlineKeyboardButton(text='Показать пост', callback_data=f"post:check%${post_id}%${text}")
+        types.InlineKeyboardButton(text='Показать пост', callback_data=f"post:check%${post_id}")
     )
     return actions_builder
 
