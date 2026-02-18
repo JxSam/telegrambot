@@ -277,16 +277,27 @@ class AdminHandler(MenuHandler):
             media = cursor.fetchone()
             conn.close()
             if media is not None:
+                media_type = media[0].lower().split('.')[-1]
                 media_path = media[0]
-                image_from_pc = FSInputFile(media_path)
-                await callback.message.answer_photo(
-                    photo=image_from_pc,
-                    caption = f"<b>️️️⚡️️ Редактирование {self.post_id}. \nТекст:</b>\n"
-                    "------------------------\n"
-                    f"{self.text}",
-                    parse_mode="HTML",
-                    reply_markup=build_reply_menu(read_buttons)
-                )
+                file_from_pc = FSInputFile(media_path)
+                if media_type in ('png', 'jpg', 'jpeg', 'webp'):
+                    await callback.message.answer_photo(
+                        photo=file_from_pc,
+                        caption = f"<b>️️️⚡️️ Редактирование {self.post_id}. \nТекст:</b>\n"
+                        "------------------------\n"
+                        f"{self.text}",
+                        parse_mode="HTML",
+                        reply_markup=build_reply_menu(read_buttons)
+                    )
+                elif media_type in ('mp4', 'mov', 'avi', 'gif', 'webm'):
+                    await callback.message.answer_video(
+                        video=file_from_pc,
+                        caption=f"<b>️️️⚡️️ Редактирование {self.post_id}. \nТекст:</b>\n"
+                                "------------------------\n"
+                                f"{self.text}",
+                        parse_mode="HTML",
+                        reply_markup=build_reply_menu(read_buttons)
+                    )
             else:
                 await callback.message.answer(
                     f"<b>️️️⚡️️ Редактирование. Текст:</b>\n"
@@ -329,7 +340,7 @@ class AdminHandler(MenuHandler):
             await callback.message.answer(
                 f"<b>🆔 поста = {self.post_id}</b>\n"
                 f"{media_checker}\n"
-                f"🔤 Текст = {self.text[:5]}" + "...",
+                f"🔤 Текст = {self.text}" + "...",
                 reply_markup=build_reply_menu(next_posts)
             )
 
@@ -486,16 +497,27 @@ class AdminHandler(MenuHandler):
         self.text = data[2]
 
         if media is not None:
+            media_type = media[0].lower().split('.')[-1]
             media_path = media[0]
-            image_from_pc = FSInputFile(media_path)
-            await message.answer_photo(
-                photo=image_from_pc,
-                caption=f"<b>️️️⚡️️ Редактирование {self.post_id}. \nТекст:</b>\n"
-                        "------------------------\n"
-                        f"{self.text}",
-                parse_mode="HTML",
-                reply_markup=build_reply_menu(read_buttons)
-            )
+            file_from_pc = FSInputFile(media_path)
+            if media_type in ('png', 'jpg', 'jpeg', 'webp'):
+                await message.answer_photo(
+                    photo=file_from_pc,
+                    caption=f"<b>️️️⚡️️ Редактирование {self.post_id}. \nТекст:</b>\n"
+                            "------------------------\n"
+                            f"{self.text}",
+                    parse_mode="HTML",
+                    reply_markup=build_reply_menu(read_buttons)
+                )
+            elif media_type in ('mp4', 'mov', 'avi', 'gif', 'webm'):
+                await message.answer_video(
+                    video=file_from_pc,
+                    caption=f"<b>️️️⚡️️ Редактирование {self.post_id}. \nТекст:</b>\n"
+                            "------------------------\n"
+                            f"{self.text}",
+                    parse_mode="HTML",
+                    reply_markup=build_reply_menu(read_buttons)
+                )
         else:
             await message.answer(
                 f"<b>️️️⚡️️ Редактирование. Текст:</b>\n"
