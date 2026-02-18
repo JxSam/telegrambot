@@ -9,7 +9,7 @@ def ensure_download_dir(dir):
     """Создает папку downloads, если она не существует."""
     os.makedirs(dir, exist_ok=True)
 
-async def delete_temp_media(file_path: str):
+def delete_temp_media(file_path: str):
     """Безопасно удаляет временный медиафайл."""
     if file_path and os.path.exists(file_path):
         try:

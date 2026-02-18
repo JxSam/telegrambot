@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS post_media (
     id INTEGER GENERATED ALWAYS PRIMARY KEY,
     post_id INTEGER NOT NULL,
     file_id TEXT NOT NULL,
-    CONSTRAINT fk_post
+    CONSTRAINT fk_posts
         FOREIGN KEY (post_id)
         REFERENCES posts(post_id)
         ON DELETE CASCADE

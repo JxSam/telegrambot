@@ -9,7 +9,7 @@ from modules.database import *
 from aiogram.filters import CommandStart, Command
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.enums import ParseMode
-from aiogram.types import BufferedInputFile
+from aiogram.types import BufferedInputFile, FSInputFile
 from modules.functions import *
 from modules.ai.service import ai_unique_text
 from modules.keyboards import *
@@ -97,8 +97,10 @@ class ParsHandler:
         conn = connect_db()
         cursor = conn.cursor()
         cursor.execute(f"INSERT INTO Posts (post_id, text) VALUES ('{post_id}', '{text}')")
+        print(post_id)
         if media_path is not None:
             cursor.execute(f"INSERT INTO post_media (post_id, file_id) VALUES ('{post_id}', '{media_path}')")
+            print(post_id, media_path)
         cursor.execute("SELECT name FROM Channels")
         self.chats = [row[0] for row in cursor.fetchall()]
         conn.commit()
@@ -269,13 +271,30 @@ class AdminHandler(MenuHandler):
                             """, (self.post_id,))
             data = cursor.fetchone()
             self.text = data[0]
+            cursor.execute("""
+                                SELECT file_id FROM post_media
+                                WHERE post_id = ?""", (self.post_id,))
+            media = cursor.fetchone()
             conn.close()
-            await callback.message.answer(
-                f"<b>️️️⚡️️ Редактирование {self.post_id}. \nТекст:</b>\n"
-                "------------------------\n"
-                f"{self.text}",
-                reply_markup=build_reply_menu(read_buttons)
-            )
+            if media is not None:
+                media_path = media[0]
+                image_from_pc = FSInputFile(media_path)
+                await callback.message.answer_photo(
+                    photo=image_from_pc,
+                    caption = f"<b>️️️⚡️️ Редактирование {self.post_id}. \nТекст:</b>\n"
+                    "------------------------\n"
+                    f"{self.text}",
+                    parse_mode="HTML",
+                    reply_markup=build_reply_menu(read_buttons)
+                )
+            else:
+                await callback.message.answer(
+                    f"<b>️️️⚡️️ Редактирование. Текст:</b>\n"
+                    "------------------------\n"
+                    f"{self.text}",
+                    reply_markup=build_reply_menu(read_buttons)
+                )
+
 
         elif action == "post:round_check":
             conn = connect_db()
@@ -287,20 +306,30 @@ class AdminHandler(MenuHandler):
                     LIMIT 1
                 """)
             data = cursor.fetchone()
-
+            cursor.execute("""
+                            SELECT count(file_id) FROM post_media
+                            WHERE post_id = ?
+                            ORDER BY post_id ASC
+                            LIMIT 1
+                        """, (data[1],))
+            media = cursor.fetchone()[0]
             conn.close()
-
+            print(media)
             if not data:
                 await callback.message.answer("🚫 Постов нет")
                 await callback.answer()
                 return
+            media_checker = ''
+            if media != 0:
+                media_checker = '👾 Есть медиа(' + str(media) + ')'
 
             self.post_id = data[1]
             self.text = data[2]
 
             await callback.message.answer(
-                f"<b>Post = {self.post_id}</b>\n"
-                f"Text = {self.text}",
+                f"<b>🆔 поста = {self.post_id}</b>\n"
+                f"{media_checker}\n"
+                f"🔤 Текст = {self.text[:5]}" + "...",
                 reply_markup=build_reply_menu(next_posts)
             )
 
@@ -361,35 +390,75 @@ class AdminHandler(MenuHandler):
         )
 
     async def publish_post(self, message: types.Message):    # 2. Публикация в целевой канал
+        conn = connect_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+                                        SELECT file_id FROM post_media
+                                        WHERE post_id = ?""", (self.post_id,))
+        media = cursor.fetchone()[0]
+        conn.close()
+        if media and os.path.exists(media):
+            media_type = media.lower().split('.')[-1]
+
+            with open(media, 'rb') as media_file:
+                media_data = media_file.read()
+
+            file_input = BufferedInputFile(media_data, filename=os.path.basename(media))
+
+            if media_type in ('png', 'jpg', 'jpeg', 'webp'):
+                sent_message = await self.bot.send_photo(
+                    chat_id=config.DESTINATION_CHANNEL,
+                    photo=file_input,
+                    caption=self.text,
+                    parse_mode=ParseMode.HTML
+                )
+            elif media_type in ('mp4', 'mov', 'avi', 'gif', 'webm'):
+                sent_message = await self.bot.send_video(
+                    chat_id=config.DESTINATION_CHANNEL,
+                    video=file_input,
+                    caption=self.text,
+                    parse_mode=ParseMode.HTML
+                )
+            else:
+                sent_message = await self.bot.send_message(
+                    chat_id=config.DESTINATION_CHANNEL,
+                    text=self.text,
+                    parse_mode=ParseMode.HTML
+                )
+        else:
             sent_message = await self.bot.send_message(
                 chat_id=config.DESTINATION_CHANNEL,
                 text=self.text,
                 parse_mode=ParseMode.HTML
             )
-            if sent_message.chat.username:
-                post_link = f"https://t.me/{sent_message.chat.username}/{sent_message.message_id}"
-            else:
-                # приватный канал
-                chat_id = str(sent_message.chat.id).replace("-100", "")
-                post_link = f"https://t.me/c/{chat_id}/{sent_message.message_id}"
-            await message.answer(
-                f'<b>✅ Опубликовано\n</b>'
-                f'Link = {post_link}',
-                parse_mode=ParseMode.HTML,
-                reply_markup=build_reply_menu(admin_kb)
-            )
-            conn = connect_db()
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM Posts WHERE post_id = ?", (self.post_id,))
-            conn.commit()
-            conn.close()
-
-    async def delete_post(self, message: types.Message):
+        if sent_message.chat.username:
+            post_link = f"https://t.me/{sent_message.chat.username}/{sent_message.message_id}"
+        else:
+            # приватный канал
+            chat_id = str(sent_message.chat.id).replace("-100", "")
+            post_link = f"https://t.me/c/{chat_id}/{sent_message.message_id}"
+        await message.answer(
+            f'<b>✅ Опубликовано\n</b>'
+            f'Link = {post_link}',
+            parse_mode=ParseMode.HTML,
+            reply_markup=build_reply_menu(admin_kb)
+        )
         conn = connect_db()
         cursor = conn.cursor()
         cursor.execute("DELETE FROM Posts WHERE post_id = ?", (self.post_id,))
         conn.commit()
         conn.close()
+
+    async def delete_post(self, message: types.Message):
+        conn = connect_db()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM Posts WHERE post_id = ?", (self.post_id,))
+        cursor.execute("SELECT file_id FROM post_media WHERE post_id = ?", (self.post_id,))
+        media_path = cursor.fetchone()[0]
+        cursor.execute("DELETE FROM post_media WHERE post_id = ?", (self.post_id,))
+        conn.commit()
+        conn.close()
+        delete_temp_media(media_path)
         await message.answer(
             f'🗑️ <b>Пост удален.</b> (ID: {self.post_id})',
             reply_markup=build_reply_menu(next_posts)
@@ -403,8 +472,11 @@ class AdminHandler(MenuHandler):
                     WHERE post_id = ?
                     ORDER BY post_id DESC
                 """, (self.post_id,))
-
         data = cursor.fetchone()
+        cursor.execute("""
+                    SELECT file_id FROM post_media
+                    WHERE post_id = ?""", (self.post_id,))
+        media = cursor.fetchone()
         conn.close()
         if not data:
             await message.answer("🚫 Ошибка, отсутствует")
@@ -413,12 +485,24 @@ class AdminHandler(MenuHandler):
         self.post_id = data[1]
         self.text = data[2]
 
-        await message.answer(
-            f"<b>️️️⚡️️ Редактирование. Текст:</b>\n"
-            "------------------------\n"
-            f"{self.text}",
-            reply_markup=build_reply_menu(read_buttons)
-        )
+        if media is not None:
+            media_path = media[0]
+            image_from_pc = FSInputFile(media_path)
+            await message.answer_photo(
+                photo=image_from_pc,
+                caption=f"<b>️️️⚡️️ Редактирование {self.post_id}. \nТекст:</b>\n"
+                        "------------------------\n"
+                        f"{self.text}",
+                parse_mode="HTML",
+                reply_markup=build_reply_menu(read_buttons)
+            )
+        else:
+            await message.answer(
+                f"<b>️️️⚡️️ Редактирование. Текст:</b>\n"
+                "------------------------\n"
+                f"{self.text}",
+                reply_markup=build_reply_menu(read_buttons)
+            )
 
     async def read_post_text(self, message: types.Message):
 
