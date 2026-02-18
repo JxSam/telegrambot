@@ -13,6 +13,12 @@ def get_db():
 
 DB_PATH = Path("../data/bot.db")
 
+links_list_table = '''
+                    CREATE TABLE IF NOT EXISTS links_list (
+                    id INTEGER PRIMARY KEY,
+                    name TEXT NOT NULL);    
+                    '''
+
 request_base_table = '''
     CREATE TABLE IF NOT EXISTS Channels (
     id INTEGER PRIMARY KEY,
@@ -68,3 +74,5 @@ def create_table(execute):
     c.executescript(execute)
     conn.commit()
     conn.close()
+
+create_table(links_list_table)

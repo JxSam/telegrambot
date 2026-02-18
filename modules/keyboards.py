@@ -17,7 +17,8 @@ admin_kb = [
 
 settings_menu_kb = [
             [types.InlineKeyboardButton(text="📋 Список каналов", callback_data="settings:list")],
-            [types.InlineKeyboardButton(text="📥 Канал куда выкладывать", callback_data="settings:channel")]
+            [types.InlineKeyboardButton(text="📥 Канал куда выкладывать", callback_data="settings:channel")],
+            [types.InlineKeyboardButton(text="🔗 Заменяющие теги", callback_data="settings:links_list")]
 ]
 
 channel_kb = [
@@ -65,27 +66,56 @@ def build_inline_menu(keyboard):
         resize_keyboard=True
     )
 
-def build_variable_list():
+def build_links_list_kb():
     """Функция для списка каналов"""
-    channels = []
+    links = []
     conn = connect_db()
     cursor = conn.cursor()
-    cursor.execute('SELECT id, name FROM Channels')
-    channels_dict = cursor.fetchall()
+    cursor.execute('SELECT id, name FROM links_list')
+    links_dict = cursor.fetchall()
     conn.close()
-    for channel in channels_dict:
-        channels.append(channel[1])
+    for link in links_dict:
+        link.append(link[1])
     keyboard = [
         [types.InlineKeyboardButton(
             text=f"📡 {ch}",
-            callback_data=f"settings:channel_actions?{ch}"
+            callback_data=f"settings:link_actions?{ch}"
         )]
-        for ch in channels
+        for ch in link
     ]
     keyboard.append(
         [
          types.InlineKeyboardButton(text="⬅️ Назад", callback_data="settings:back"),
-         types.InlineKeyboardButton(text="➕ Добавить", callback_data="settings:channel_add")
+         types.InlineKeyboardButton(text="➕ Добавить", callback_data="settings:link_add")
+        ]
+    )
+
+    return types.InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+def build_variable_list(object, table):
+    """Функция для списка каналов
+    object - объект перебора в таблице
+    table - таблица в БД
+    """
+    list = []
+    conn = connect_db()
+    cursor = conn.cursor()
+    cursor.execute(f'SELECT id, name FROM {table}')
+    list_dict = cursor.fetchall()
+    conn.close()
+    for unit in list_dict:
+        list.append(unit[1])
+    keyboard = [
+        [types.InlineKeyboardButton(
+            text=f"📡 {ch}",
+            callback_data=f"settings:{object}_actions?{ch}"
+        )]
+        for ch in list
+    ]
+    keyboard.append(
+        [
+         types.InlineKeyboardButton(text="⬅️ Назад", callback_data="settings:back"),
+         types.InlineKeyboardButton(text="➕ Добавить", callback_data=f"settings:{object}_add")
         ]
     )
 
@@ -100,6 +130,14 @@ def build_channel_actions(name_channel):
         resize_keyboard=True
     )
 
+def build_link_actions(name_link):
+    return types.InlineKeyboardMarkup(
+        inline_keyboard=[
+                [types.InlineKeyboardButton(text="⬅️ Назад", callback_data="settings:link_list")],
+                [types.InlineKeyboardButton(text="❌ Удалить", callback_data=f"settings:link_delete?{name_link}")]
+        ],
+        resize_keyboard=True
+    )
 
 def build_actions_menu(post_id, text):
     actions_builder = InlineKeyboardBuilder()

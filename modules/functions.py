@@ -1,4 +1,4 @@
-import os
+import os, re
 from html import escape
 
 def escape_html_entities(text: str) -> str:
@@ -17,3 +17,13 @@ def delete_temp_media(file_path: str):
             print(f"🗑️ Временный медиафайл удален: {file_path}")
         except Exception as e:
             print(f"❌ Ошибка при удалении файла {file_path}: {e}")
+
+def word_replace(words, text):
+    word_list = [re.escape(word) for (word,) in words]
+
+    pattern = r'(' + '|'.join(word_list) + r')'
+
+    text = re.sub(pattern, '', text)
+    text = re.sub(r'\s+', ' ', text).strip()
+
+    return text

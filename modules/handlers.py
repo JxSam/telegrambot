@@ -113,7 +113,14 @@ class ParsHandler:
     async def handler_new_post(self, event):
         """Обрабатывает новое сообщение в любом из исходных каналов."""
         if not event.message.text and not event.message.media: return
+        conn = connect_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM links_list")
+        links = cursor.fetchall()
+        conn.close()
+
         post_text = event.message.text
+        post_text = word_replace(links, post_text)
         final_text = post_text + config.SIGNATURE
         media_path = None
         media_info = ""
@@ -149,6 +156,7 @@ class SettingsHandler(MenuHandler, ParsHandler):
     def __init__(self, dp: Dispatcher, pars_handler: ParsHandler):
         super().__init__(dp)
         self.pars_handler = pars_handler
+        self.object = ''
 
     async def open_settings(self, message: types.Message):
         await message.answer(
@@ -160,21 +168,22 @@ class SettingsHandler(MenuHandler, ParsHandler):
     async def get_channel(self, message: types.Message, state: FSMContext):
         channel = message.text.strip()
 
-        if not channel.startswith("@"):
+        if not channel.startswith("@") and self.object == 'Канал':
             await message.answer("❌ Канал должен быть в формате @channel_name")
+            await state.clear()
             return
 
         with get_db() as conn:
             cursor = conn.cursor()
             cursor.execute(self.execute.format(channel))
 
-        await message.answer(f"✅ Канал {channel} сохранён")
+        await message.answer(f"✅ {self.object} {channel} сохранён")
         await state.clear()
 
     async def callback(self, callback: types.CallbackQuery, state: FSMContext):
         data = callback.data.split("?")
         action = data[0]
-
+        # --- Настройки списка каналов ---
         if action == "settings:channel_actions":
             channel = data[1]
             await callback.message.edit_text(
@@ -183,6 +192,29 @@ class SettingsHandler(MenuHandler, ParsHandler):
                 parse_mode="HTML",
                 reply_markup=build_channel_actions(channel)
             )
+
+        elif action == "settings:channel_edit":
+            await callback.message.edit_text(
+                "Пришлите ссылку на канал @channel_name"
+            )
+            self.execute = "UPDATE Settings SET value = '{}' WHERE name = 'DESTINATION_CHANNEL'"
+            self.object = 'Канал'
+            await state.set_state(SettingsState.waiting_channel)
+
+        elif action == "settings:list":
+            await callback.message.edit_text(
+                "📋 <b>Подключeнные каналы</b>",
+                parse_mode="HTML",
+                reply_markup=build_variable_list(object='channel', table='Channels')
+            )
+
+        elif action == "settings:channel_add":
+            await callback.message.edit_text(
+                "Пришлите ссылку на канал @channel_name"
+            )
+            self.execute = "INSERT OR IGNORE INTO Channels (name) VALUES ('{}')"
+            self.object = 'Канал'
+            await state.set_state(SettingsState.waiting_channel)
 
         elif action == "settings:channel_delete":
             channel = data[1]
@@ -194,27 +226,43 @@ class SettingsHandler(MenuHandler, ParsHandler):
                 f"❌ Канал {channel} удалён"
             )
 
-        elif action == "settings:list":
+        # --- Настройки списка тегов ---
+        if action == "settings:link_actions":
+            link = data[1]
             await callback.message.edit_text(
-                "📋 <b>Подключeнные каналы</b>",
+                f"📡 <b>Тег:</b> {link}\n\n"
+                "Вы хотите удалить тег?",
                 parse_mode="HTML",
-                reply_markup=build_variable_list()
+                reply_markup=build_link_actions(link)
             )
 
-        elif action == "settings:channel_add":
+        elif action == "settings:link_delete":
+            link = data[1]
+            with get_db() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM links_list WHERE name = ?", (link,))
+
             await callback.message.edit_text(
-                "Пришлите ссылку на канал @channel_name"
+                f"❌ Тег {link} удалён"
             )
-            self.execute = "INSERT OR IGNORE INTO Channels (name) VALUES ('{}')"
+
+        elif action == "settings:links_list":
+            await callback.message.edit_text(
+                "📋 <b>Ссылки для замены</b>\n"
+                "Это теги каналов, которые будут заменяться",
+                parse_mode="HTML",
+                reply_markup=build_variable_list(object='link', table='links_list')
+            )
+
+        elif action == "settings:link_add":
+            await callback.message.edit_text(
+                "Пришлите заменяющий тег(Например: @channel_name)"
+            )
+            self.execute = "INSERT OR IGNORE INTO links_list (name) VALUES ('{}')"
+            self.object = 'Тег'
             await state.set_state(SettingsState.waiting_channel)
 
-        elif action == "settings:channel_edit":
-            await callback.message.edit_text(
-                "Пришлите ссылку на канал @channel_name"
-            )
-            self.execute = "UPDATE Settings SET value = '{}' WHERE name = 'DESTINATION_CHANNEL'"
-            await state.set_state(SettingsState.waiting_channel)
-
+        # --- Настройка канала ---
         elif action == "settings:channel":
             with get_db() as conn:
                 cursor = conn.cursor()
@@ -404,9 +452,12 @@ class AdminHandler(MenuHandler):
         conn = connect_db()
         cursor = conn.cursor()
         cursor.execute("""
-                                        SELECT file_id FROM post_media
-                                        WHERE post_id = ?""", (self.post_id,))
+                    SELECT file_id FROM post_media
+                    WHERE post_id = ?""", (self.post_id,))
         media = cursor.fetchone()[0]
+        cursor.execute("DELETE FROM Posts WHERE post_id = ?", (self.post_id,))
+        cursor.execute("DELETE FROM post_media WHERE post_id = ?", (self.post_id,))
+        conn.commit()
         conn.close()
         if media and os.path.exists(media):
             media_type = media.lower().split('.')[-1]
@@ -454,22 +505,22 @@ class AdminHandler(MenuHandler):
             parse_mode=ParseMode.HTML,
             reply_markup=build_reply_menu(admin_kb)
         )
-        conn = connect_db()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM Posts WHERE post_id = ?", (self.post_id,))
-        conn.commit()
-        conn.close()
+        if media is not None:
+            delete_temp_media(media)
 
     async def delete_post(self, message: types.Message):
+        media_path = None
         conn = connect_db()
         cursor = conn.cursor()
         cursor.execute("DELETE FROM Posts WHERE post_id = ?", (self.post_id,))
         cursor.execute("SELECT file_id FROM post_media WHERE post_id = ?", (self.post_id,))
-        media_path = cursor.fetchone()[0]
+        if cursor.fetchone() is not None:
+            media_path = cursor.fetchone()[0]
         cursor.execute("DELETE FROM post_media WHERE post_id = ?", (self.post_id,))
         conn.commit()
         conn.close()
-        delete_temp_media(media_path)
+        if media_path is not None:
+            delete_temp_media(media_path)
         await message.answer(
             f'🗑️ <b>Пост удален.</b> (ID: {self.post_id})',
             reply_markup=build_reply_menu(next_posts)
