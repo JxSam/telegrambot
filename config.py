@@ -19,12 +19,7 @@ BOT_TOKEN = "8566777029:AAE7uEGvY5aVzKHHcXbsVpK7dEXvCiwpIKk"
 TELEGRAM_PASSWORD = "JohnyX2003"
 
 # Каналы
-SOURCE_CHANNELS = ["@my_brak"]
-DESTINATION_CHANNEL = "@pnewsgg"  # Куда постить
 ADMIN_ID = 1112309604  # Твой ID
-
-# Подпись
-SIGNATURE = "\n\n@pnewsgg"
 
 # Режимы работы
 MODE = "REVIEW"  # "REVIEW" (ручная проверка) или "AUTO" (автоматическая публикация)

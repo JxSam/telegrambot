@@ -13,47 +13,43 @@ def get_db():
 
 DB_PATH = Path("../data/bot.db")
 
-links_list_table = '''
-                    CREATE TABLE IF NOT EXISTS links_list (
-                    id INTEGER PRIMARY KEY,
-                    name TEXT NOT NULL);    
-                    '''
-
-request_base_table = '''
-    CREATE TABLE IF NOT EXISTS Channels (
-    id INTEGER PRIMARY KEY,
-    name TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS Settings (
-    id INTEGER PRIMARY KEY,
-    name TEXT NOT NULL,
-    value TEXT
-    );
-    INSERT OR IGNORE INTO Settings (id, name, value) VALUES
-        (0, 'SIGNATURE', '@pnewsgg'),
-        (1, 'MODE', 'REVIEW'),
-        (2, 'OPENROUTER_API_KEY', 'YOUR_API_KEY'),
-        (3, 'OPENROUTER_MODEL_NAME', 'openai/gpt-4o-mini'),
-        (4, 'DESTINATION_CHANNEL', '@pnewsgg');
-    INSERT OR IGNORE INTO Channels (id, name) VALUES
-        (0, '@my_brak'),
-        (1, '@whackdoor');
-    '''
-
-request_post_table = '''
-    CREATE TABLE IF NOT EXISTS posts (
-    post_id INTEGER GENERATED ALWAYS PRIMARY KEY,
-    text TEXT,
-    old_text TEXT
-);
-CREATE TABLE IF NOT EXISTS post_media (
-    id INTEGER GENERATED ALWAYS PRIMARY KEY,
-    post_id INTEGER NOT NULL,
-    file_id TEXT NOT NULL,
-    CONSTRAINT fk_posts
-        FOREIGN KEY (post_id)
-        REFERENCES posts(post_id)
-        ON DELETE CASCADE
+request_create_tables = '''
+                CREATE TABLE IF NOT EXISTS links_list (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL);
+                INSERT OR IGNORE INTO links_list (name) VALUES ('@exploitex');
+                CREATE TABLE IF NOT EXISTS Channels (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS Settings (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                value TEXT
+                );
+                INSERT OR IGNORE INTO Settings (id, name, value) VALUES
+                (0, 'SIGNATURE', '@pnewsgg'),
+                (1, 'MODE', 'REVIEW'),
+                (2, 'API_KEY', 'YOUR_API_KEY'),
+                (3, 'MODEL_NAME', 'openai/gpt-4o-mini'),
+                (4, 'DESTINATION_CHANNEL', '@pnewsgg'),
+                (5, 'AI_PROMPT', 'PROMPT');
+                INSERT OR IGNORE INTO Channels (id, name) VALUES
+                (0, '@my_brak'),
+                (1, '@whackdoor');
+                CREATE TABLE IF NOT EXISTS posts (
+                post_id INTEGER GENERATED ALWAYS PRIMARY KEY,
+                text TEXT,
+                old_text TEXT
+                );
+                CREATE TABLE IF NOT EXISTS post_media (
+                id INTEGER GENERATED ALWAYS PRIMARY KEY,
+                post_id INTEGER NOT NULL,
+                file_id TEXT NOT NULL,
+                CONSTRAINT fk_posts
+                FOREIGN KEY (post_id)
+                REFERENCES posts(post_id)
+                ON DELETE CASCADE
 );
     '''
 
@@ -75,4 +71,4 @@ def create_table(execute):
     conn.commit()
     conn.close()
 
-create_table(links_list_table)
+create_table(request_create_tables)

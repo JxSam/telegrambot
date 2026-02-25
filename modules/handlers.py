@@ -14,6 +14,9 @@ from modules.functions import *
 from modules.ai.service import ai_unique_text
 from modules.keyboards import *
 from utils import *
+from telethon.utils import pack_bot_file_id
+from aiogram.types import InputMediaPhoto, InputMediaVideo, InputMediaDocument
+from aiogram.enums import ParseMode
 
 # --- Главное меню ---
 class MenuHandler:
@@ -31,9 +34,13 @@ class MenuHandler:
         )
 
     async def admin(self, message: types.Message):
+        conn = connect_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM Posts ORDER BY post_id DESC")
+        posts = cursor.fetchall()
+
         await message.answer(
-            "📦 Очередь постов: 0\n"
-            "⌛️ Запланировано: 0\n"
+            f"📦 Очередь постов: {len(posts)}\n"
             "✅ Бот слушает каналы и присылает уведомления\n"
             "👉 Выберите действие\n",
             reply_markup=build_reply_menu(admin_kb)
@@ -117,11 +124,14 @@ class ParsHandler:
         cursor = conn.cursor()
         cursor.execute("SELECT name FROM links_list")
         links = cursor.fetchall()
+        cursor.execute('SELECT value FROM Settings WHERE name = "DESTINATION_CHANNEL"')
+        channel = cursor.fetchall()[0][0]
         conn.close()
 
         post_text = event.message.text
         post_text = word_replace(links, post_text)
-        final_text = post_text + config.SIGNATURE
+        final_text = post_text + channel
+        print(final_text)
         media_path = None
         media_info = ""
 
@@ -138,8 +148,8 @@ class ParsHandler:
         print(f"Получен новый пост{media_info} из {event.chat_id}. Режим: {config.MODE}")
 
         if config.MODE == "AUTO":
-            await self.bot.send_message(chat_id=config.DESTINATION_CHANNEL, text=final_text, parse_mode=ParseMode.HTML)
-            print(f"✅ Пост автоматически опубликован в {config.DESTINATION_CHANNEL}.")
+            await self.bot.send_message(chat_id=channel, text=final_text, parse_mode=ParseMode.HTML)
+            print(f"✅ Пост автоматически опубликован в {channel}.")
             if media_path: await delete_temp_media(media_path)
         elif config.MODE == "REVIEW":
             await self.send_to_review(final_text, media_info, media_path)
@@ -280,6 +290,47 @@ class SettingsHandler(MenuHandler, ParsHandler):
                 "⚙️ <b>Настройки</b>\n\nВыберите пункт:",
                 parse_mode="HTML",
                 reply_markup=build_inline_menu(settings_menu_kb)
+            )
+
+        # --- AI settings ---
+        elif action == "settings:ai_settings":
+            with get_db() as conn:
+                cursor = conn.cursor()
+                cursor.execute('SELECT value FROM Settings WHERE name = "MODEL_NAME" or name = "API_KEY"')
+                channel = cursor.fetchall()
+            await callback.message.edit_text(
+                "🧬 <b>Настройки ИИ:</b>\n"
+                f"API_KEY = {channel[0][0]}\n"
+                f"MODEL_NAME = {channel[1][0]}\n",
+                parse_mode="HTML",
+                reply_markup=build_inline_menu(settings_ai_kb)
+            )
+
+        elif action == "settings:API_KEY":
+            await callback.message.edit_text(
+                "Пришлите API KEY(ключ не проверяется)"
+            )
+            self.execute = "UPDATE Settings SET value = '{}' WHERE name = 'API_KEY'"
+            self.object = 'API KEY'
+            await state.set_state(SettingsState.waiting_channel)
+
+        elif action == "settings:MODEL_NAME":
+            await callback.message.edit_text(
+                "Пришлите Model_name(не проверяется)"
+            )
+            self.execute = "UPDATE Settings SET value = '{}' WHERE name = 'MODEL_NAME'"
+            self.object = 'MODEL NAME'
+            await state.set_state(SettingsState.waiting_channel)
+
+        elif action == "settings:channel":
+            with get_db() as conn:
+                cursor = conn.cursor()
+                cursor.execute('SELECT value FROM Settings WHERE name = "DESTINATION_CHANNEL"')
+                channel = cursor.fetchall()[0][0]
+            await callback.message.edit_text(
+                f"Текущий {channel}\n",
+                parse_mode="HTML",
+                reply_markup=build_inline_menu(channel_kb)
             )
 
         await callback.answer()
@@ -457,6 +508,8 @@ class AdminHandler(MenuHandler):
         media = cursor.fetchone()[0]
         cursor.execute("DELETE FROM Posts WHERE post_id = ?", (self.post_id,))
         cursor.execute("DELETE FROM post_media WHERE post_id = ?", (self.post_id,))
+        cursor.execute('SELECT value FROM Settings WHERE name = "DESTINATION_CHANNEL"')
+        DESTINATION_CHANNEL = cursor.fetchall()[0][0]
         conn.commit()
         conn.close()
         if media and os.path.exists(media):
@@ -469,27 +522,27 @@ class AdminHandler(MenuHandler):
 
             if media_type in ('png', 'jpg', 'jpeg', 'webp'):
                 sent_message = await self.bot.send_photo(
-                    chat_id=config.DESTINATION_CHANNEL,
+                    chat_id=DESTINATION_CHANNEL,
                     photo=file_input,
                     caption=self.text,
                     parse_mode=ParseMode.HTML
                 )
             elif media_type in ('mp4', 'mov', 'avi', 'gif', 'webm'):
                 sent_message = await self.bot.send_video(
-                    chat_id=config.DESTINATION_CHANNEL,
+                    chat_id=DESTINATION_CHANNEL,
                     video=file_input,
                     caption=self.text,
                     parse_mode=ParseMode.HTML
                 )
             else:
                 sent_message = await self.bot.send_message(
-                    chat_id=config.DESTINATION_CHANNEL,
+                    chat_id=DESTINATION_CHANNEL,
                     text=self.text,
                     parse_mode=ParseMode.HTML
                 )
         else:
             sent_message = await self.bot.send_message(
-                chat_id=config.DESTINATION_CHANNEL,
+                chat_id=DESTINATION_CHANNEL,
                 text=self.text,
                 parse_mode=ParseMode.HTML
             )

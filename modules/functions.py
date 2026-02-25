@@ -20,10 +20,7 @@ def delete_temp_media(file_path: str):
 
 def word_replace(words, text):
     word_list = [re.escape(word) for (word,) in words]
-
-    pattern = r'(' + '|'.join(word_list) + r')'
-
+    pattern = r'\n+\s*(' + '|'.join(word_list) + r')'
     text = re.sub(pattern, '', text)
-    text = re.sub(r'\s+', ' ', text).strip()
 
     return text

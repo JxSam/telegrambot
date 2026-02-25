@@ -1,6 +1,8 @@
 from aiogram import types
+from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 from modules.database import connect_db
+from modules.functions import escape_html_entities
 
 # --- Кнопки ---
 main_menu_keyboard = [
@@ -9,16 +11,23 @@ main_menu_keyboard = [
 ]
 
 admin_kb = [
-            [types.KeyboardButton(text="📤 Просмотр очереди"),
-             types.KeyboardButton(text="🕓 Запланированные")],
+            [types.KeyboardButton(text="📤 Просмотр очереди")],
             [types.KeyboardButton(text="🌐 Главное меню"),
              types.KeyboardButton(text="⚙️ Настройки")]
 ]
 
+settings_ai_kb = [
+            [types.InlineKeyboardButton(text='API_KEY', callback_data='settings:API_KEY'),
+              types.InlineKeyboardButton(text='MODEL_NAME', callback_data='settings:MODEL_NAME')],
+            [types.InlineKeyboardButton(text='AI_PROMPT', callback_data='MODEL_NAME')],
+            [types.InlineKeyboardButton(text="⬅️ Назад", callback_data="settings:back")]
+]
+
 settings_menu_kb = [
-            [types.InlineKeyboardButton(text="📋 Список каналов", callback_data="settings:list")],
-            [types.InlineKeyboardButton(text="📥 Канал куда выкладывать", callback_data="settings:channel")],
-            [types.InlineKeyboardButton(text="🔗 Заменяющие теги", callback_data="settings:links_list")]
+            [types.InlineKeyboardButton(text="📋 Список каналов", callback_data="settings:list"),
+             types.InlineKeyboardButton(text="🔗 Заменяющие теги", callback_data="settings:links_list")],
+            [types.InlineKeyboardButton(text="📥 Канал куда выкладывать", callback_data="settings:channel"),
+             types.InlineKeyboardButton(text="🧬 AI settings", callback_data="settings:ai_settings")]
 ]
 
 channel_kb = [
@@ -107,7 +116,7 @@ def build_variable_list(object, table):
         list.append(unit[1])
     keyboard = [
         [types.InlineKeyboardButton(
-            text=f"📡 {ch}",
+            text=f"{escape_html_entities(ch)}",
             callback_data=f"settings:{object}_actions?{ch}"
         )]
         for ch in list
