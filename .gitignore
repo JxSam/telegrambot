@@ -3,5 +3,6 @@ downloads
 parser_session.session
 parser_session.session-journal
 .idea
-test.py
-data
+__pycache__/
+modules/__pycache__/
+modules/ai/__pycache__/
