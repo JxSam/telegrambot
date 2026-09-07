@@ -9,17 +9,17 @@ load_dotenv()
 DOWNLOAD_DIR = 'downloads'
 
 # Telegram API (от my.telegram.org)
-API_ID = 24445592
-API_HASH = "eae79b2a0476a5af0aaa4e55d7615efe"
+API_ID =
+API_HASH = ""
 
 # Бот-админ (от BotFather)
-BOT_TOKEN = "8566777029:AAE7uEGvY5aVzKHHcXbsVpK7dEXvCiwpIKk"
+BOT_TOKEN = ""
 
 # Добавьте ваш облачный пароль (2FA) сюда!
-TELEGRAM_PASSWORD = "JohnyX2003"
+TELEGRAM_PASSWORD = ""
 
 # Каналы
-ADMIN_ID = 1112309604  # Твой ID
+ADMIN_ID =   # Твой ID
 
 # Режимы работы
 MODE = "REVIEW"  # "REVIEW" (ручная проверка) или "AUTO" (автоматическая публикация)
